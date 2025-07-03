@@ -11,6 +11,7 @@ export interface ProjectData {
     initializeGit: boolean;
   };
   files?: GeneratedFile[];
+  notebook?: KaggleNotebook;
   error?: string;
   createdAt: string;
   estimatedCompletion?: string;
@@ -19,6 +20,13 @@ export interface ProjectData {
 export interface GeneratedFile {
   path: string;
   content: string;
+}
+
+export interface KaggleNotebook {
+  path: string;
+  content: string;
+  expectedScore?: string;
+  description: string;
 }
 
 const STORAGE_KEY = 'kaggle_launchpad_projects';

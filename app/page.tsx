@@ -19,17 +19,19 @@ import {
   CheckCircle, 
   XCircle, 
   Clock,
-  FolderTree,
+  FileText,
   ExternalLink,
   Zap,
   Trophy,
   TrendingUp,
   History,
-  Code
+  Code,
+  BookOpen,
+  Target,
+  Sparkles
 } from 'lucide-react';
-import { ProjectGenerator } from '@/lib/project-generator';
+import { NotebookGenerator } from '@/lib/notebook-generator';
 import { ClientStorage, ProjectData } from '@/lib/client-storage';
-import { ZipGenerator } from '@/lib/zip-generator';
 
 interface ProjectGenerationOptions {
   includeEDA: boolean;
@@ -46,74 +48,12 @@ interface GenerationStatus {
   estimatedCompletion?: string;
 }
 
-interface ProjectStructure {
-  name: string;
-  type: 'file' | 'folder';
-  children?: ProjectStructure[];
-}
-
 const popularCompetitions = [
-  { name: 'Titanic', url: 'titanic', difficulty: 'Beginner', icon: '🚢' },
-  { name: 'House Prices', url: 'house-prices-advanced-regression-techniques', difficulty: 'Intermediate', icon: '🏠' },
-  { name: 'Digit Recognizer', url: 'digit-recognizer', difficulty: 'Beginner', icon: '🔢' },
-  { name: 'Natural Language Processing', url: 'nlp-getting-started', difficulty: 'Intermediate', icon: '💬' },
+  { name: 'Titanic', url: 'titanic', difficulty: 'Beginner', icon: '🚢', score: '0.77-0.82' },
+  { name: 'House Prices', url: 'house-prices-advanced-regression-techniques', difficulty: 'Intermediate', icon: '🏠', score: '0.12-0.15 RMSE' },
+  { name: 'Digit Recognizer', url: 'digit-recognizer', difficulty: 'Beginner', icon: '🔢', score: '0.95-0.98' },
+  { name: 'Natural Language Processing', url: 'nlp-getting-started', difficulty: 'Intermediate', icon: '💬', score: '0.80-0.85' },
 ];
-
-const sampleProjectStructure: ProjectStructure = {
-  name: 'kaggle-competition',
-  type: 'folder',
-  children: [
-    {
-      name: 'notebooks',
-      type: 'folder',
-      children: [
-        { name: 'eda.ipynb', type: 'file' },
-        { name: 'baseline.ipynb', type: 'file' }
-      ]
-    },
-    {
-      name: 'src',
-      type: 'folder',
-      children: [
-        { name: 'data_preprocessing.py', type: 'file' },
-        { name: 'model.py', type: 'file' },
-        { name: 'utils.py', type: 'file' },
-        { name: 'submission.py', type: 'file' }
-      ]
-    },
-    { name: 'data', type: 'folder' },
-    { name: 'submissions', type: 'folder' },
-    { name: 'models', type: 'folder' },
-    { name: 'README.md', type: 'file' },
-    { name: 'requirements.txt', type: 'file' },
-    { name: '.gitignore', type: 'file' }
-  ]
-};
-
-function FileTreeItem({ item, level = 0 }: { item: ProjectStructure; level?: number }) {
-  const paddingLeft = level * 20 + 8;
-  
-  return (
-    <div>
-      <div 
-        className="flex items-center py-1 text-sm hover:bg-slate-50 rounded transition-colors"
-        style={{ paddingLeft }}
-      >
-        {item.type === 'folder' ? (
-          <FolderTree className="w-4 h-4 mr-2 text-indigo-500" />
-        ) : (
-          <div className="w-2 h-2 mr-4 bg-slate-400 rounded-full" />
-        )}
-        <span className={item.type === 'folder' ? 'font-medium text-slate-700' : 'text-slate-600'}>
-          {item.name}
-        </span>
-      </div>
-      {item.children?.map((child, index) => (
-        <FileTreeItem key={index} item={child} level={level + 1} />
-      ))}
-    </div>
-  );
-}
 
 export default function Home() {
   const [competitionInput, setCompetitionInput] = useState('');
@@ -154,10 +94,10 @@ export default function Home() {
 
   const simulateGeneration = async (projectId: string, competitionName: string, options: ProjectGenerationOptions) => {
     const steps = [
-      { step: 'Analyzing competition...', progress: 20, delay: 1000 },
-      { step: 'Generating project structure...', progress: 40, delay: 1500 },
-      { step: 'Creating notebooks and scripts...', progress: 70, delay: 2000 },
-      { step: 'Finalizing project files...', progress: 90, delay: 1000 },
+      { step: 'Analyzing competition type...', progress: 20, delay: 800 },
+      { step: 'Generating Kaggle-optimized notebook...', progress: 50, delay: 1200 },
+      { step: 'Adding EDA and preprocessing...', progress: 75, delay: 1000 },
+      { step: 'Finalizing model and submission code...', progress: 95, delay: 800 },
     ];
 
     try {
@@ -179,8 +119,11 @@ export default function Home() {
         }
       }
 
-      // Generate actual files
-      const files = await ProjectGenerator.generateProject(competitionName, options);
+      // Generate actual notebook
+      const notebook = await NotebookGenerator.generateKaggleNotebook(competitionName, {
+        includeEDA: options.includeEDA,
+        includeBaseline: options.includeBaseline,
+      });
       
       // Complete the project
       const completedProject: ProjectData = {
@@ -188,9 +131,9 @@ export default function Home() {
         competitionName,
         status: 'completed',
         progress: 100,
-        currentStep: 'Project generated successfully!',
+        currentStep: 'Kaggle notebook ready!',
         options,
-        files,
+        notebook,
         createdAt: new Date().toISOString(),
       };
 
@@ -200,15 +143,15 @@ export default function Home() {
       setGenerationStatus({
         status: 'completed',
         progress: 100,
-        currentStep: 'Project generated successfully!',
+        currentStep: 'Kaggle notebook ready!',
         projectId,
       });
 
-      toast.success('Your Kaggle project is ready for download!');
+      toast.success('Your Kaggle notebook is ready for download!');
       loadRecentProjects();
 
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to generate project';
+      const errorMessage = error instanceof Error ? error.message : 'Failed to generate notebook';
       
       setGenerationStatus({
         status: 'error',
@@ -236,7 +179,7 @@ export default function Home() {
       return;
     }
 
-    const projectId = `project_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const projectId = `notebook_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const competitionName = competitionInput.includes('kaggle.com') 
       ? competitionInput.match(/competitions\/([^\/\?]+)/)?.[1] || competitionInput
       : competitionInput;
@@ -247,10 +190,10 @@ export default function Home() {
       competitionName,
       status: 'generating',
       progress: 10,
-      currentStep: 'Initializing project generation...',
+      currentStep: 'Initializing notebook generation...',
       options,
       createdAt: new Date().toISOString(),
-      estimatedCompletion: new Date(Date.now() + 3 * 60 * 1000).toISOString(),
+      estimatedCompletion: new Date(Date.now() + 2 * 60 * 1000).toISOString(),
     };
 
     ClientStorage.saveProject(initialProject);
@@ -259,26 +202,34 @@ export default function Home() {
     setGenerationStatus({ 
       status: 'generating', 
       progress: 10, 
-      currentStep: 'Initializing project generation...',
+      currentStep: 'Initializing notebook generation...',
       projectId,
     });
     
-    toast.success('Project generation started!');
+    toast.success('Kaggle notebook generation started!');
 
     // Start generation simulation
     simulateGeneration(projectId, competitionName, options);
   };
 
   const handleDownload = async () => {
-    if (!currentProject?.files) {
-      toast.error('No project files available for download');
+    if (!currentProject?.notebook) {
+      toast.error('No notebook available for download');
       return;
     }
 
     try {
-      const zipBlob = await ZipGenerator.createProjectZip(currentProject.files, currentProject.id);
-      ZipGenerator.downloadFile(zipBlob, `kaggle-project-${currentProject.competitionName}-${currentProject.id}.zip`);
-      toast.success('Project ZIP file downloaded!');
+      const blob = new Blob([currentProject.notebook.content], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = currentProject.notebook.path;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      toast.success('Kaggle notebook downloaded!');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Download failed';
       toast.error(errorMessage);
@@ -328,17 +279,17 @@ export default function Home() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-slate-900">Kaggle Launchpad</h1>
-                <p className="text-sm text-slate-600">AI-powered competition project generator</p>
+                <p className="text-sm text-slate-600">Single-notebook Kaggle competition generator</p>
               </div>
             </div>
             <div className="flex items-center space-x-3">
-              <Badge variant="secondary" className="bg-blue-100 text-blue-700">
-                <Code className="w-3 h-3 mr-1" />
-                Client-Side
+              <Badge variant="secondary" className="bg-orange-100 text-orange-700">
+                <BookOpen className="w-3 h-3 mr-1" />
+                Single Notebook
               </Badge>
               <Badge variant="secondary" className="bg-indigo-100 text-indigo-700">
-                <Trophy className="w-3 h-3 mr-1" />
-                Production Ready
+                <Target className="w-3 h-3 mr-1" />
+                Kaggle-Optimized
               </Badge>
             </div>
           </div>
@@ -349,15 +300,43 @@ export default function Home() {
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Main Input Section */}
           <div className="lg:col-span-2 space-y-6">
+            {/* Hero Section */}
+            <Card className="shadow-lg border-0 bg-gradient-to-r from-indigo-500 to-purple-600 text-white">
+              <CardContent className="p-8">
+                <div className="flex items-center space-x-3 mb-4">
+                  <Sparkles className="w-8 h-8" />
+                  <h2 className="text-2xl font-bold">Kaggle-First Approach</h2>
+                </div>
+                <p className="text-lg opacity-90 mb-4">
+                  Generate complete, ready-to-run Kaggle notebooks that work directly in the Kaggle environment. 
+                  No setup required - just copy, paste, and submit!
+                </p>
+                <div className="flex items-center space-x-6 text-sm">
+                  <div className="flex items-center space-x-2">
+                    <FileText className="w-4 h-4" />
+                    <span>Single Notebook</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Zap className="w-4 h-4" />
+                    <span>Zero Setup</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Target className="w-4 h-4" />
+                    <span>Competition Ready</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Input Card */}
             <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Play className="w-5 h-5 text-indigo-500" />
-                  <span>Generate Your Project</span>
+                  <span>Generate Your Kaggle Notebook</span>
                 </CardTitle>
                 <CardDescription>
-                  Enter a Kaggle competition name or URL to generate a complete project scaffold
+                  Enter a Kaggle competition name or URL to generate a complete, ready-to-run notebook
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -375,8 +354,8 @@ export default function Home() {
                 </div>
 
                 <div className="space-y-4">
-                  <h4 className="text-sm font-medium text-slate-700">Generation Options</h4>
-                  <div className="grid sm:grid-cols-3 gap-4">
+                  <h4 className="text-sm font-medium text-slate-700">Notebook Options</h4>
+                  <div className="grid sm:grid-cols-2 gap-4">
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         id="eda"
@@ -387,7 +366,7 @@ export default function Home() {
                       />
                       <label htmlFor="eda" className="text-sm text-slate-700 flex items-center space-x-1">
                         <BarChart3 className="w-4 h-4" />
-                        <span>Include EDA</span>
+                        <span>Include EDA Section</span>
                       </label>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -403,19 +382,6 @@ export default function Home() {
                         <span>Include Baseline Model</span>
                       </label>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="git"
-                        checked={options.initializeGit}
-                        onCheckedChange={(checked) => 
-                          setOptions(prev => ({ ...prev, initializeGit: checked as boolean }))
-                        }
-                      />
-                      <label htmlFor="git" className="text-sm text-slate-700 flex items-center space-x-1">
-                        <GitBranch className="w-4 h-4" />
-                        <span>Initialize Git</span>
-                      </label>
-                    </div>
                   </div>
                 </div>
 
@@ -427,12 +393,12 @@ export default function Home() {
                   {generationStatus.status === 'generating' ? (
                     <>
                       <Zap className="w-4 h-4 mr-2 animate-spin" />
-                      Generating Project...
+                      Generating Notebook...
                     </>
                   ) : (
                     <>
-                      <Rocket className="w-4 h-4 mr-2" />
-                      Generate Project
+                      <FileText className="w-4 h-4 mr-2" />
+                      Generate Kaggle Notebook
                     </>
                   )}
                 </Button>
@@ -474,33 +440,64 @@ export default function Home() {
             )}
 
             {/* Results Card */}
-            {generationStatus.status === 'completed' && currentProject?.files && (
+            {generationStatus.status === 'completed' && currentProject?.notebook && (
               <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
                     <CheckCircle className="w-5 h-5 text-green-500" />
-                    <span>Project Generated Successfully!</span>
+                    <span>Kaggle Notebook Ready!</span>
                   </CardTitle>
                   <CardDescription>
-                    Your Kaggle competition project is ready for download
+                    Your competition-ready notebook is generated and ready for Kaggle
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="bg-slate-50 rounded-lg p-4 max-h-64 overflow-y-auto">
-                    <h4 className="text-sm font-medium text-slate-700 mb-3">Project Structure</h4>
-                    <FileTreeItem item={sampleProjectStructure} />
+                  <div className="bg-slate-50 rounded-lg p-4">
+                    <h4 className="text-sm font-medium text-slate-700 mb-3">Notebook Features</h4>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className="flex items-center space-x-2">
+                        <FileText className="w-4 h-4 text-indigo-500" />
+                        <span>Single .ipynb file</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Target className="w-4 h-4 text-green-500" />
+                        <span>Kaggle-optimized paths</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <BarChart3 className="w-4 h-4 text-blue-500" />
+                        <span>Complete EDA section</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Brain className="w-4 h-4 text-purple-500" />
+                        <span>Baseline model included</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between text-sm text-slate-600">
-                    <span>Files generated: {currentProject.files.length}</span>
-                    <span>Competition: {currentProject.competitionName}</span>
+                  
+                  <div className="flex items-center justify-between text-sm text-slate-600 bg-indigo-50 p-3 rounded-lg">
+                    <div>
+                      <span className="font-medium">Expected Score: </span>
+                      <span className="text-indigo-700">{currentProject.notebook.expectedScore}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium">Competition: </span>
+                      <span>{currentProject.competitionName}</span>
+                    </div>
                   </div>
-                  <Button 
-                    onClick={handleDownload}
-                    className="w-full h-12 bg-green-500 hover:bg-green-600 transition-all duration-200"
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Download Project ZIP
-                  </Button>
+
+                  <div className="space-y-3">
+                    <Button 
+                      onClick={handleDownload}
+                      className="w-full h-12 bg-green-500 hover:bg-green-600 transition-all duration-200"
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Download Kaggle Notebook (.ipynb)
+                    </Button>
+                    
+                    <div className="text-xs text-slate-500 text-center">
+                      💡 Upload this notebook directly to Kaggle and run all cells to generate your submission!
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             )}
@@ -533,12 +530,15 @@ export default function Home() {
                           <p className="font-medium text-slate-800 group-hover:text-indigo-700">
                             {competition.name}
                           </p>
-                          <Badge 
-                            variant="secondary" 
-                            className={`text-xs ${getDifficultyColor(competition.difficulty)}`}
-                          >
-                            {competition.difficulty}
-                          </Badge>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <Badge 
+                              variant="secondary" 
+                              className={`text-xs ${getDifficultyColor(competition.difficulty)}`}
+                            >
+                              {competition.difficulty}
+                            </Badge>
+                            <span className="text-xs text-slate-500">{competition.score}</span>
+                          </div>
                         </div>
                       </div>
                       <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-indigo-500" />
@@ -554,10 +554,10 @@ export default function Home() {
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
                     <History className="w-5 h-5 text-indigo-500" />
-                    <span>Recent Projects</span>
+                    <span>Recent Notebooks</span>
                   </CardTitle>
                   <CardDescription>
-                    Your recently generated projects
+                    Your recently generated notebooks
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -566,12 +566,12 @@ export default function Home() {
                       key={project.id}
                       className="p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer"
                       onClick={() => {
-                        if (project.status === 'completed' && project.files) {
+                        if (project.status === 'completed' && project.notebook) {
                           setCurrentProject(project);
                           setGenerationStatus({
                             status: 'completed',
                             progress: 100,
-                            currentStep: 'Project ready for download',
+                            currentStep: 'Notebook ready for download',
                             projectId: project.id,
                           });
                         }
@@ -605,30 +605,30 @@ export default function Home() {
               </Card>
             )}
 
-            {/* Generation Stats */}
+            {/* Benefits Card */}
             <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
               <CardHeader>
-                <CardTitle className="text-lg">What You Get</CardTitle>
+                <CardTitle className="text-lg">Why Single Notebooks?</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-600">Ready-to-run notebooks</span>
-                  <Badge variant="outline">EDA + Baseline</Badge>
+                  <span className="text-sm text-slate-600">Zero setup time</span>
+                  <Badge variant="outline">Copy & Run</Badge>
                 </div>
                 <Separator />
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-600">Python scripts</span>
-                  <Badge variant="outline">5+ files</Badge>
+                  <span className="text-sm text-slate-600">Kaggle-optimized</span>
+                  <Badge variant="outline">Built-in paths</Badge>
                 </div>
                 <Separator />
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-600">Project structure</span>
-                  <Badge variant="outline">Production-ready</Badge>
+                  <span className="text-sm text-slate-600">Complete solution</span>
+                  <Badge variant="outline">EDA to submission</Badge>
                 </div>
                 <Separator />
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-600">Local storage</span>
-                  <Badge variant="outline">Browser-based</Badge>
+                  <span className="text-sm text-slate-600">Expected scores</span>
+                  <Badge variant="outline">Performance targets</Badge>
                 </div>
               </CardContent>
             </Card>
@@ -646,16 +646,17 @@ export default function Home() {
                 <span className="font-semibold text-slate-900">Kaggle Launchpad</span>
               </div>
               <p className="text-sm text-slate-600">
-                Accelerate your machine learning journey with AI-powered project generation and local storage.
+                Generate ready-to-run Kaggle notebooks that work directly in the Kaggle environment. 
+                Zero setup, maximum productivity.
               </p>
             </div>
             <div>
               <h4 className="font-semibold text-slate-900 mb-4">Features</h4>
               <ul className="space-y-2 text-sm text-slate-600">
-                <li>• Real project generation</li>
-                <li>• Client-side processing</li>
-                <li>• Local browser storage</li>
-                <li>• Production-ready code</li>
+                <li>• Single notebook generation</li>
+                <li>• Kaggle-optimized code</li>
+                <li>• Competition-specific templates</li>
+                <li>• Expected performance scores</li>
               </ul>
             </div>
             <div>
@@ -667,7 +668,12 @@ export default function Home() {
                     <ExternalLink className="w-3 h-3" />
                   </a>
                 </li>
-                <li><a href="#" className="hover:text-indigo-500 transition-colors">Documentation</a></li>
+                <li>
+                  <a href="https://www.kaggle.com/learn" className="hover:text-indigo-500 transition-colors flex items-center space-x-1">
+                    <span>Kaggle Learn</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </li>
                 <li><a href="#" className="hover:text-indigo-500 transition-colors">Support</a></li>
               </ul>
             </div>
@@ -675,7 +681,7 @@ export default function Home() {
           <Separator className="my-6" />
           <div className="flex justify-between items-center text-sm text-slate-500">
             <p>&copy; 2025 Kaggle Launchpad. All rights reserved.</p>
-            <p>Built with Next.js & Tailwind CSS</p>
+            <p>Built for the Kaggle community 🚀</p>
           </div>
         </div>
       </footer>
