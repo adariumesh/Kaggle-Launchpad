@@ -25,8 +25,11 @@ import {
   Trophy,
   TrendingUp,
   History,
-  Database
+  Code
 } from 'lucide-react';
+import { ProjectGenerator } from '@/lib/project-generator';
+import { ClientStorage, ProjectData } from '@/lib/client-storage';
+import { ZipGenerator } from '@/lib/zip-generator';
 
 interface ProjectGenerationOptions {
   includeEDA: boolean;
@@ -35,21 +38,12 @@ interface ProjectGenerationOptions {
 }
 
 interface GenerationStatus {
-  status: 'idle' | 'queued' | 'running' | 'completed' | 'error';
+  status: 'idle' | 'generating' | 'completed' | 'error';
   progress: number;
   currentStep: string;
   error?: string;
   projectId?: string;
   estimatedCompletion?: string;
-}
-
-interface RecentProject {
-  id: string;
-  competitionName: string;
-  status: string;
-  progress: number;
-  createdAt: string;
-  options: ProjectGenerationOptions;
 }
 
 interface ProjectStructure {
@@ -133,63 +127,22 @@ export default function Home() {
     progress: 0,
     currentStep: 'Ready to generate',
   });
-  const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
+  const [recentProjects, setRecentProjects] = useState<ProjectData[]>([]);
+  const [currentProject, setCurrentProject] = useState<ProjectData | null>(null);
 
   // Load recent projects on mount
   useEffect(() => {
     loadRecentProjects();
   }, []);
 
-  const loadRecentProjects = async () => {
+  const loadRecentProjects = () => {
     try {
-      const response = await fetch('/api/recent-projects?limit=5');
-      if (response.ok) {
-        const projects = await response.json();
-        setRecentProjects(projects);
-      }
+      const projects = ClientStorage.getRecentProjects(5);
+      setRecentProjects(projects);
     } catch (error) {
       console.error('Failed to load recent projects:', error);
     }
   };
-
-  // Poll for status updates
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    
-    if (generationStatus.projectId && 
-        (generationStatus.status === 'queued' || generationStatus.status === 'running')) {
-      interval = setInterval(async () => {
-        try {
-          const response = await fetch(`/api/get-status?projectId=${generationStatus.projectId}`);
-          const data = await response.json();
-          
-          if (response.ok) {
-            setGenerationStatus(prev => ({
-              ...prev,
-              status: data.status,
-              progress: data.progress,
-              currentStep: data.currentStep,
-              error: data.error,
-              estimatedCompletion: data.estimatedCompletion
-            }));
-            
-            if (data.status === 'completed') {
-              toast.success('Your Kaggle project is ready for download!');
-              loadRecentProjects(); // Refresh recent projects
-            } else if (data.status === 'error') {
-              toast.error(data.error || 'Project generation failed');
-            }
-          }
-        } catch (error) {
-          console.error('Status polling error:', error);
-        }
-      }, 2000);
-    }
-    
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [generationStatus.projectId, generationStatus.status]);
 
   const validateInput = (input: string): boolean => {
     if (!input.trim()) return false;
@@ -199,82 +152,133 @@ export default function Home() {
     return urlPattern.test(input) || namePattern.test(input);
   };
 
+  const simulateGeneration = async (projectId: string, competitionName: string, options: ProjectGenerationOptions) => {
+    const steps = [
+      { step: 'Analyzing competition...', progress: 20, delay: 1000 },
+      { step: 'Generating project structure...', progress: 40, delay: 1500 },
+      { step: 'Creating notebooks and scripts...', progress: 70, delay: 2000 },
+      { step: 'Finalizing project files...', progress: 90, delay: 1000 },
+    ];
+
+    try {
+      for (const { step, progress, delay } of steps) {
+        await new Promise(resolve => setTimeout(resolve, delay));
+        
+        setGenerationStatus(prev => ({
+          ...prev,
+          progress,
+          currentStep: step,
+        }));
+
+        // Update stored project
+        const project = ClientStorage.getProject(projectId);
+        if (project) {
+          project.progress = progress;
+          project.currentStep = step;
+          ClientStorage.saveProject(project);
+        }
+      }
+
+      // Generate actual files
+      const files = await ProjectGenerator.generateProject(competitionName, options);
+      
+      // Complete the project
+      const completedProject: ProjectData = {
+        id: projectId,
+        competitionName,
+        status: 'completed',
+        progress: 100,
+        currentStep: 'Project generated successfully!',
+        options,
+        files,
+        createdAt: new Date().toISOString(),
+      };
+
+      ClientStorage.saveProject(completedProject);
+      setCurrentProject(completedProject);
+      
+      setGenerationStatus({
+        status: 'completed',
+        progress: 100,
+        currentStep: 'Project generated successfully!',
+        projectId,
+      });
+
+      toast.success('Your Kaggle project is ready for download!');
+      loadRecentProjects();
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to generate project';
+      
+      setGenerationStatus({
+        status: 'error',
+        progress: 0,
+        currentStep: 'Generation failed',
+        error: errorMessage,
+        projectId,
+      });
+
+      // Update stored project with error
+      const project = ClientStorage.getProject(projectId);
+      if (project) {
+        project.status = 'error';
+        project.error = errorMessage;
+        ClientStorage.saveProject(project);
+      }
+
+      toast.error(errorMessage);
+    }
+  };
+
   const handleGenerate = async () => {
     if (!validateInput(competitionInput)) {
       toast.error('Please enter a valid competition name (letters, numbers, hyphens) or Kaggle competition URL');
       return;
     }
 
+    const projectId = `project_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const competitionName = competitionInput.includes('kaggle.com') 
+      ? competitionInput.match(/competitions\/([^\/\?]+)/)?.[1] || competitionInput
+      : competitionInput;
+
+    // Create initial project
+    const initialProject: ProjectData = {
+      id: projectId,
+      competitionName,
+      status: 'generating',
+      progress: 10,
+      currentStep: 'Initializing project generation...',
+      options,
+      createdAt: new Date().toISOString(),
+      estimatedCompletion: new Date(Date.now() + 3 * 60 * 1000).toISOString(),
+    };
+
+    ClientStorage.saveProject(initialProject);
+    setCurrentProject(initialProject);
+
     setGenerationStatus({ 
-      status: 'queued', 
+      status: 'generating', 
       progress: 10, 
-      currentStep: 'Initializing project generation...' 
+      currentStep: 'Initializing project generation...',
+      projectId,
     });
     
-    try {
-      const response = await fetch('/api/init-project', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          competition: competitionInput,
-          options: options
-        })
-      });
+    toast.success('Project generation started!');
 
-      const data = await response.json();
-
-      if (response.ok) {
-        setGenerationStatus(prev => ({
-          ...prev,
-          projectId: data.projectId,
-          status: data.status,
-          progress: data.progress,
-          currentStep: data.currentStep
-        }));
-        toast.success('Project generation started!');
-      } else {
-        throw new Error(data.error || 'Failed to start project generation');
-      }
-
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to generate project';
-      setGenerationStatus({ 
-        status: 'error', 
-        progress: 0, 
-        currentStep: 'Generation failed',
-        error: errorMessage
-      });
-      toast.error(errorMessage);
-    }
+    // Start generation simulation
+    simulateGeneration(projectId, competitionName, options);
   };
 
   const handleDownload = async () => {
-    if (!generationStatus.projectId) {
-      toast.error('No project available for download');
+    if (!currentProject?.files) {
+      toast.error('No project files available for download');
       return;
     }
 
     try {
-      const response = await fetch(`/api/download-project?projectId=${generationStatus.projectId}`);
-      
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `kaggle-project-${generationStatus.projectId}.zip`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        
-        toast.success('Project ZIP file downloaded!');
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Download failed');
-      }
+      const zipBlob = await ZipGenerator.createProjectZip(currentProject.files, currentProject.id);
+      ZipGenerator.downloadFile(zipBlob, `kaggle-project-${currentProject.competitionName}-${currentProject.id}.zip`);
+      toast.success('Project ZIP file downloaded!');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Download failed';
       toast.error(errorMessage);
@@ -296,8 +300,7 @@ export default function Home() {
 
   const getStatusIcon = () => {
     switch (generationStatus.status) {
-      case 'queued': return <Clock className="w-5 h-5 text-yellow-500 animate-pulse" />;
-      case 'running': return <Zap className="w-5 h-5 text-blue-500 animate-spin" />;
+      case 'generating': return <Zap className="w-5 h-5 text-blue-500 animate-spin" />;
       case 'completed': return <CheckCircle className="w-5 h-5 text-green-500" />;
       case 'error': return <XCircle className="w-5 h-5 text-red-500" />;
       default: return <Rocket className="w-5 h-5 text-slate-400" />;
@@ -329,9 +332,9 @@ export default function Home() {
               </div>
             </div>
             <div className="flex items-center space-x-3">
-              <Badge variant="secondary" className="bg-green-100 text-green-700">
-                <Database className="w-3 h-3 mr-1" />
-                Supabase Powered
+              <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                <Code className="w-3 h-3 mr-1" />
+                Client-Side
               </Badge>
               <Badge variant="secondary" className="bg-indigo-100 text-indigo-700">
                 <Trophy className="w-3 h-3 mr-1" />
@@ -418,10 +421,10 @@ export default function Home() {
 
                 <Button 
                   onClick={handleGenerate}
-                  disabled={generationStatus.status === 'running' || generationStatus.status === 'queued'}
+                  disabled={generationStatus.status === 'generating'}
                   className="w-full h-12 text-base bg-indigo-500 hover:bg-indigo-600 transition-all duration-200"
                 >
-                  {generationStatus.status === 'running' || generationStatus.status === 'queued' ? (
+                  {generationStatus.status === 'generating' ? (
                     <>
                       <Zap className="w-4 h-4 mr-2 animate-spin" />
                       Generating Project...
@@ -456,7 +459,7 @@ export default function Home() {
                       className="h-2"
                     />
                   </div>
-                  {generationStatus.estimatedCompletion && generationStatus.status === 'running' && (
+                  {generationStatus.estimatedCompletion && generationStatus.status === 'generating' && (
                     <div className="text-xs text-slate-500">
                       Estimated completion: {formatDate(generationStatus.estimatedCompletion)}
                     </div>
@@ -471,7 +474,7 @@ export default function Home() {
             )}
 
             {/* Results Card */}
-            {generationStatus.status === 'completed' && (
+            {generationStatus.status === 'completed' && currentProject?.files && (
               <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
@@ -486,6 +489,10 @@ export default function Home() {
                   <div className="bg-slate-50 rounded-lg p-4 max-h-64 overflow-y-auto">
                     <h4 className="text-sm font-medium text-slate-700 mb-3">Project Structure</h4>
                     <FileTreeItem item={sampleProjectStructure} />
+                  </div>
+                  <div className="flex items-center justify-between text-sm text-slate-600">
+                    <span>Files generated: {currentProject.files.length}</span>
+                    <span>Competition: {currentProject.competitionName}</span>
                   </div>
                   <Button 
                     onClick={handleDownload}
@@ -557,7 +564,18 @@ export default function Home() {
                   {recentProjects.map((project) => (
                     <div 
                       key={project.id}
-                      className="p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors"
+                      className="p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer"
+                      onClick={() => {
+                        if (project.status === 'completed' && project.files) {
+                          setCurrentProject(project);
+                          setGenerationStatus({
+                            status: 'completed',
+                            progress: 100,
+                            currentStep: 'Project ready for download',
+                            projectId: project.id,
+                          });
+                        }
+                      }}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1 min-w-0">
@@ -609,8 +627,8 @@ export default function Home() {
                 </div>
                 <Separator />
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-600">Persistent storage</span>
-                  <Badge variant="outline">Supabase DB</Badge>
+                  <span className="text-sm text-slate-600">Local storage</span>
+                  <Badge variant="outline">Browser-based</Badge>
                 </div>
               </CardContent>
             </Card>
@@ -628,15 +646,15 @@ export default function Home() {
                 <span className="font-semibold text-slate-900">Kaggle Launchpad</span>
               </div>
               <p className="text-sm text-slate-600">
-                Accelerate your machine learning journey with AI-powered project generation and persistent storage.
+                Accelerate your machine learning journey with AI-powered project generation and local storage.
               </p>
             </div>
             <div>
               <h4 className="font-semibold text-slate-900 mb-4">Features</h4>
               <ul className="space-y-2 text-sm text-slate-600">
                 <li>• Real project generation</li>
-                <li>• Supabase backend integration</li>
-                <li>• Persistent project storage</li>
+                <li>• Client-side processing</li>
+                <li>• Local browser storage</li>
                 <li>• Production-ready code</li>
               </ul>
             </div>
@@ -649,12 +667,7 @@ export default function Home() {
                     <ExternalLink className="w-3 h-3" />
                   </a>
                 </li>
-                <li>
-                  <a href="https://supabase.com" className="hover:text-indigo-500 transition-colors flex items-center space-x-1">
-                    <span>Supabase</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                </li>
+                <li><a href="#" className="hover:text-indigo-500 transition-colors">Documentation</a></li>
                 <li><a href="#" className="hover:text-indigo-500 transition-colors">Support</a></li>
               </ul>
             </div>
@@ -662,7 +675,7 @@ export default function Home() {
           <Separator className="my-6" />
           <div className="flex justify-between items-center text-sm text-slate-500">
             <p>&copy; 2025 Kaggle Launchpad. All rights reserved.</p>
-            <p>Built with Next.js, Supabase & Tailwind CSS</p>
+            <p>Built with Next.js & Tailwind CSS</p>
           </div>
         </div>
       </footer>
