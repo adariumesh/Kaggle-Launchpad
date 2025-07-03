@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ProjectGenerator } from '@/lib/project-generator';
 import { ProjectService } from '@/lib/supabase';
 
+export const dynamic = 'force-dynamic';
+
 interface ProjectGenerationRequest {
   competition: string;
   options: {

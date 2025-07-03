@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ProjectService } from '@/lib/supabase';
 import { ZipGenerator } from '@/lib/zip-generator';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
