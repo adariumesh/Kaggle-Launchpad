@@ -37,7 +37,15 @@ import {
   ChevronUp,
   Cpu,
   Layers,
-  Sliders
+  Sliders,
+  Beaker,
+  Microscope,
+  Gauge,
+  Shield,
+  Lightbulb,
+  Workflow,
+  Database,
+  Activity
 } from 'lucide-react';
 import { NotebookGenerator } from '@/lib/notebook-generator';
 import { ClientStorage, ProjectData } from '@/lib/client-storage';
@@ -51,6 +59,20 @@ interface ProjectGenerationOptions {
   includeAdvancedFeatureEngineering: boolean;
   crossValidationFolds: number;
   hyperparameterTuning: boolean;
+  // Ultra-advanced options
+  ensembleMethod: 'none' | 'voting' | 'stacking' | 'blending';
+  autoFeatureSelection: boolean;
+  includeDeepLearning: boolean;
+  dataAugmentation: boolean;
+  outlierDetection: 'none' | 'isolation-forest' | 'local-outlier-factor' | 'one-class-svm';
+  dimensionalityReduction: 'none' | 'pca' | 'tsne' | 'umap';
+  advancedValidation: 'simple' | 'stratified' | 'time-series' | 'group' | 'adversarial';
+  includeExplainability: boolean;
+  optimizationObjective: 'accuracy' | 'speed' | 'memory' | 'interpretability';
+  includeAutoML: boolean;
+  generateDocumentation: boolean;
+  includeUnitTests: boolean;
+  codeOptimization: 'none' | 'basic' | 'advanced';
 }
 
 interface GenerationStatus {
@@ -71,10 +93,11 @@ const popularCompetitions = [
 
 const getAvailableModels = (competitionType: string) => {
   const modelMap: Record<string, string[]> = {
-    'classification': ['XGBoost', 'RandomForest', 'LogisticRegression', 'LightGBM', 'CatBoost', 'SVM'],
-    'regression': ['XGBoost', 'RandomForest', 'LinearRegression', 'LightGBM', 'CatBoost', 'SVR'],
-    'nlp': ['LogisticRegression', 'RandomForest', 'XGBoost', 'NaiveBayes', 'SVM'],
-    'computer-vision': ['RandomForest', 'XGBoost', 'CNN', 'ResNet', 'EfficientNet'],
+    'classification': ['XGBoost', 'RandomForest', 'LogisticRegression', 'LightGBM', 'CatBoost', 'SVM', 'NeuralNetwork'],
+    'regression': ['XGBoost', 'RandomForest', 'LinearRegression', 'LightGBM', 'CatBoost', 'SVR', 'NeuralNetwork'],
+    'nlp': ['LogisticRegression', 'RandomForest', 'XGBoost', 'NaiveBayes', 'SVM', 'BERT', 'Transformer'],
+    'computer-vision': ['RandomForest', 'XGBoost', 'CNN', 'ResNet', 'EfficientNet', 'ViT'],
+    'time-series': ['XGBoost', 'RandomForest', 'LSTM', 'Prophet', 'ARIMA', 'Transformer'],
     'other': ['XGBoost', 'RandomForest', 'LogisticRegression', 'LightGBM']
   };
   return modelMap[competitionType] || modelMap['other'];
@@ -83,14 +106,20 @@ const getAvailableModels = (competitionType: string) => {
 const detectCompetitionType = (name: string): string => {
   const lowerName = name.toLowerCase();
   
-  if (lowerName.includes('nlp') || lowerName.includes('sentiment') || lowerName.includes('text')) {
+  if (lowerName.includes('nlp') || lowerName.includes('sentiment') || lowerName.includes('text') || lowerName.includes('language')) {
     return 'nlp';
   }
-  if (lowerName.includes('image') || lowerName.includes('vision') || lowerName.includes('digit')) {
+  if (lowerName.includes('image') || lowerName.includes('vision') || lowerName.includes('digit') || lowerName.includes('photo')) {
     return 'computer-vision';
   }
-  if (lowerName.includes('price') || lowerName.includes('sales') || lowerName.includes('revenue')) {
+  if (lowerName.includes('price') || lowerName.includes('sales') || lowerName.includes('revenue') || lowerName.includes('forecast')) {
     return 'regression';
+  }
+  if (lowerName.includes('time') || lowerName.includes('series') || lowerName.includes('temporal') || lowerName.includes('sequence')) {
+    return 'time-series';
+  }
+  if (lowerName.includes('tabular') || lowerName.includes('structured')) {
+    return 'tabular';
   }
   return 'classification';
 };
@@ -99,6 +128,7 @@ export default function Home() {
   const [competitionInput, setCompetitionInput] = useState('');
   const [competitionType, setCompetitionType] = useState('classification');
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+  const [showUltraAdvancedOptions, setShowUltraAdvancedOptions] = useState(false);
   const [options, setOptions] = useState<ProjectGenerationOptions>({
     includeEDA: true,
     includeBaseline: true,
@@ -108,6 +138,20 @@ export default function Home() {
     includeAdvancedFeatureEngineering: false,
     crossValidationFolds: 5,
     hyperparameterTuning: false,
+    // Ultra-advanced defaults
+    ensembleMethod: 'none',
+    autoFeatureSelection: false,
+    includeDeepLearning: false,
+    dataAugmentation: false,
+    outlierDetection: 'none',
+    dimensionalityReduction: 'none',
+    advancedValidation: 'simple',
+    includeExplainability: false,
+    optimizationObjective: 'accuracy',
+    includeAutoML: false,
+    generateDocumentation: false,
+    includeUnitTests: false,
+    codeOptimization: 'none',
   });
   const [generationStatus, setGenerationStatus] = useState<GenerationStatus>({
     status: 'idle',
@@ -151,17 +195,57 @@ export default function Home() {
     return urlPattern.test(input) || namePattern.test(input);
   };
 
+  const getComplexityLevel = (): 'beginner' | 'intermediate' | 'advanced' | 'expert' => {
+    let complexity = 0;
+    
+    if (options.includeAdvancedFeatureEngineering) complexity += 1;
+    if (options.hyperparameterTuning) complexity += 1;
+    if (options.ensembleMethod !== 'none') complexity += 2;
+    if (options.includeDeepLearning) complexity += 3;
+    if (options.autoFeatureSelection) complexity += 1;
+    if (options.dimensionalityReduction !== 'none') complexity += 1;
+    if (options.advancedValidation !== 'simple') complexity += 1;
+    if (options.includeExplainability) complexity += 1;
+    if (options.includeAutoML) complexity += 2;
+    if (options.codeOptimization === 'advanced') complexity += 1;
+    
+    if (complexity <= 2) return 'beginner';
+    if (complexity <= 5) return 'intermediate';
+    if (complexity <= 9) return 'advanced';
+    return 'expert';
+  };
+
   const simulateGeneration = async (projectId: string, competitionName: string, options: ProjectGenerationOptions) => {
-    const steps = [
-      { step: 'Analyzing competition type...', progress: 15, delay: 800 },
-      { step: 'Configuring advanced model settings...', progress: 30, delay: 1000 },
-      { step: 'Generating optimized Kaggle notebook...', progress: 60, delay: 1500 },
-      { step: 'Adding advanced feature engineering...', progress: 80, delay: 1200 },
-      { step: 'Finalizing model and evaluation code...', progress: 95, delay: 800 },
+    const complexity = getComplexityLevel();
+    const baseSteps = [
+      { step: 'Analyzing competition architecture...', progress: 10, delay: 800 },
+      { step: 'Configuring ultra-advanced model settings...', progress: 25, delay: 1000 },
+      { step: 'Generating optimized Kaggle notebook...', progress: 45, delay: 1500 },
     ];
 
+    const advancedSteps = [];
+    if (options.ensembleMethod !== 'none') {
+      advancedSteps.push({ step: `Setting up ${options.ensembleMethod} ensemble...`, progress: 60, delay: 1200 });
+    }
+    if (options.includeDeepLearning) {
+      advancedSteps.push({ step: 'Configuring deep learning architecture...', progress: 70, delay: 1000 });
+    }
+    if (options.includeAutoML) {
+      advancedSteps.push({ step: 'Integrating AutoML pipeline...', progress: 80, delay: 1500 });
+    }
+    if (options.includeExplainability) {
+      advancedSteps.push({ step: 'Adding model explainability features...', progress: 85, delay: 800 });
+    }
+
+    const finalSteps = [
+      { step: 'Optimizing memory usage and performance...', progress: 90, delay: 800 },
+      { step: 'Finalizing ultra-advanced solution...', progress: 95, delay: 600 },
+    ];
+
+    const allSteps = [...baseSteps, ...advancedSteps, ...finalSteps];
+
     try {
-      for (const { step, progress, delay } of steps) {
+      for (const { step, progress, delay } of allSteps) {
         await new Promise(resolve => setTimeout(resolve, delay));
         
         setGenerationStatus(prev => ({
@@ -188,6 +272,19 @@ export default function Home() {
         includeAdvancedFeatureEngineering: options.includeAdvancedFeatureEngineering,
         crossValidationFolds: options.crossValidationFolds,
         hyperparameterTuning: options.hyperparameterTuning,
+        ensembleMethod: options.ensembleMethod,
+        autoFeatureSelection: options.autoFeatureSelection,
+        includeDeepLearning: options.includeDeepLearning,
+        dataAugmentation: options.dataAugmentation,
+        outlierDetection: options.outlierDetection,
+        dimensionalityReduction: options.dimensionalityReduction,
+        advancedValidation: options.advancedValidation,
+        includeExplainability: options.includeExplainability,
+        optimizationObjective: options.optimizationObjective,
+        includeAutoML: options.includeAutoML,
+        generateDocumentation: options.generateDocumentation,
+        includeUnitTests: options.includeUnitTests,
+        codeOptimization: options.codeOptimization,
       });
       
       // Complete the project
@@ -196,7 +293,7 @@ export default function Home() {
         competitionName,
         status: 'completed',
         progress: 100,
-        currentStep: 'Advanced Kaggle notebook ready!',
+        currentStep: `Ultra-advanced ${complexity} notebook ready!`,
         options,
         notebook,
         createdAt: new Date().toISOString(),
@@ -208,11 +305,11 @@ export default function Home() {
       setGenerationStatus({
         status: 'completed',
         progress: 100,
-        currentStep: 'Advanced Kaggle notebook ready!',
+        currentStep: `Ultra-advanced ${complexity} notebook ready!`,
         projectId,
       });
 
-      toast.success(`Your advanced ${options.selectedModel} notebook is ready for download!`);
+      toast.success(`Your ${complexity}-level ${options.selectedModel} notebook is ready!`);
       loadRecentProjects();
 
     } catch (error) {
@@ -249,16 +346,19 @@ export default function Home() {
       ? competitionInput.match(/competitions\/([^\/\?]+)/)?.[1] || competitionInput
       : competitionInput;
 
+    const complexity = getComplexityLevel();
+    const estimatedTime = complexity === 'expert' ? 5 : complexity === 'advanced' ? 4 : 3;
+
     // Create initial project
     const initialProject: ProjectData = {
       id: projectId,
       competitionName,
       status: 'generating',
       progress: 5,
-      currentStep: 'Initializing advanced notebook generation...',
+      currentStep: `Initializing ${complexity}-level notebook generation...`,
       options,
       createdAt: new Date().toISOString(),
-      estimatedCompletion: new Date(Date.now() + 3 * 60 * 1000).toISOString(),
+      estimatedCompletion: new Date(Date.now() + estimatedTime * 60 * 1000).toISOString(),
     };
 
     ClientStorage.saveProject(initialProject);
@@ -267,11 +367,11 @@ export default function Home() {
     setGenerationStatus({ 
       status: 'generating', 
       progress: 5, 
-      currentStep: 'Initializing advanced notebook generation...',
+      currentStep: `Initializing ${complexity}-level notebook generation...`,
       projectId,
     });
     
-    toast.success(`Advanced ${options.selectedModel} notebook generation started!`);
+    toast.success(`Ultra-advanced ${options.selectedModel} notebook generation started!`);
 
     // Start generation simulation
     simulateGeneration(projectId, competitionName, options);
@@ -294,7 +394,7 @@ export default function Home() {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
       
-      toast.success('Advanced Kaggle notebook downloaded!');
+      toast.success('Ultra-advanced Kaggle notebook downloaded!');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Download failed';
       toast.error(errorMessage);
@@ -310,6 +410,16 @@ export default function Home() {
       case 'Beginner': return 'bg-green-100 text-green-800';
       case 'Intermediate': return 'bg-yellow-100 text-yellow-800';
       case 'Advanced': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getComplexityColor = (complexity: string) => {
+    switch (complexity) {
+      case 'beginner': return 'bg-green-100 text-green-800';
+      case 'intermediate': return 'bg-blue-100 text-blue-800';
+      case 'advanced': return 'bg-orange-100 text-orange-800';
+      case 'expert': return 'bg-purple-100 text-purple-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -333,30 +443,31 @@ export default function Home() {
   };
 
   const availableModels = getAvailableModels(competitionType);
+  const currentComplexity = getComplexityLevel();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50 to-purple-50">
       {/* Header */}
       <div className="border-b bg-white/80 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center">
+              <div className="w-10 h-10 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
                 <Rocket className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-slate-900">Kaggle Launchpad</h1>
-                <p className="text-sm text-slate-600">Advanced single-notebook Kaggle competition generator</p>
+                <h1 className="text-2xl font-bold text-slate-900">Kaggle Launchpad Ultra</h1>
+                <p className="text-sm text-slate-600">Ultra-advanced AI-powered Kaggle competition generator</p>
               </div>
             </div>
             <div className="flex items-center space-x-3">
               <Badge variant="secondary" className="bg-orange-100 text-orange-700">
-                <BookOpen className="w-3 h-3 mr-1" />
-                Single Notebook
+                <Beaker className="w-3 h-3 mr-1" />
+                Ultra-Advanced
               </Badge>
-              <Badge variant="secondary" className="bg-indigo-100 text-indigo-700">
-                <Target className="w-3 h-3 mr-1" />
-                Advanced Config
+              <Badge variant="secondary" className={getComplexityColor(currentComplexity)}>
+                <Gauge className="w-3 h-3 mr-1" />
+                {currentComplexity}
               </Badge>
             </div>
           </div>
@@ -368,28 +479,32 @@ export default function Home() {
           {/* Main Input Section */}
           <div className="lg:col-span-2 space-y-6">
             {/* Hero Section */}
-            <Card className="shadow-lg border-0 bg-gradient-to-r from-indigo-500 to-purple-600 text-white">
+            <Card className="shadow-lg border-0 bg-gradient-to-r from-indigo-500 via-purple-600 to-pink-600 text-white">
               <CardContent className="p-8">
                 <div className="flex items-center space-x-3 mb-4">
                   <Sparkles className="w-8 h-8" />
-                  <h2 className="text-2xl font-bold">Advanced Kaggle-First Approach</h2>
+                  <h2 className="text-2xl font-bold">Ultra-Advanced AI Competition Generator</h2>
                 </div>
                 <p className="text-lg opacity-90 mb-4">
-                  Generate highly customized, competition-ready Kaggle notebooks with advanced model configurations, 
-                  feature engineering, and hyperparameter tuning. Zero setup required!
+                  Generate production-ready Kaggle notebooks with cutting-edge ML techniques: ensemble methods, 
+                  AutoML integration, deep learning, advanced feature engineering, and model explainability.
                 </p>
-                <div className="flex items-center space-x-6 text-sm">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                   <div className="flex items-center space-x-2">
-                    <Cpu className="w-4 h-4" />
-                    <span>Model Selection</span>
+                    <Workflow className="w-4 h-4" />
+                    <span>Ensemble Methods</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Layers className="w-4 h-4" />
-                    <span>Advanced Features</span>
+                    <Brain className="w-4 h-4" />
+                    <span>AutoML Integration</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Sliders className="w-4 h-4" />
-                    <span>Hyperparameter Tuning</span>
+                    <Microscope className="w-4 h-4" />
+                    <span>Model Explainability</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Shield className="w-4 h-4" />
+                    <span>Production Ready</span>
                   </div>
                 </div>
               </CardContent>
@@ -400,10 +515,10 @@ export default function Home() {
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Play className="w-5 h-5 text-indigo-500" />
-                  <span>Generate Your Advanced Kaggle Notebook</span>
+                  <span>Generate Ultra-Advanced Kaggle Notebook</span>
                 </CardTitle>
                 <CardDescription>
-                  Enter a Kaggle competition name or URL to generate a customized, ready-to-run notebook
+                  Create a cutting-edge, competition-ready notebook with advanced ML techniques and optimizations
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -419,14 +534,17 @@ export default function Home() {
                     className="h-12 text-base"
                   />
                   {competitionInput && (
-                    <div className="text-xs text-slate-500">
-                      Detected type: <span className="font-medium capitalize">{competitionType}</span>
+                    <div className="flex items-center space-x-2 text-xs text-slate-500">
+                      <span>Detected type: <span className="font-medium capitalize">{competitionType}</span></span>
+                      <Badge variant="outline" className={getComplexityColor(currentComplexity)}>
+                        {currentComplexity} complexity
+                      </Badge>
                     </div>
                   )}
                 </div>
 
                 <div className="space-y-4">
-                  <h4 className="text-sm font-medium text-slate-700">Basic Options</h4>
+                  <h4 className="text-sm font-medium text-slate-700">Core Options</h4>
                   <div className="grid sm:grid-cols-2 gap-4">
                     <div className="flex items-center space-x-2">
                       <Checkbox
@@ -438,7 +556,7 @@ export default function Home() {
                       />
                       <Label htmlFor="eda" className="text-sm text-slate-700 flex items-center space-x-1">
                         <BarChart3 className="w-4 h-4" />
-                        <span>Include Advanced EDA</span>
+                        <span>Ultra-Advanced EDA</span>
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -451,7 +569,7 @@ export default function Home() {
                       />
                       <Label htmlFor="baseline" className="text-sm text-slate-700 flex items-center space-x-1">
                         <Brain className="w-4 h-4" />
-                        <span>Include Model Training</span>
+                        <span>Advanced Model Training</span>
                       </Label>
                     </div>
                   </div>
@@ -515,7 +633,7 @@ export default function Home() {
 
                       <div className="space-y-2">
                         <Label htmlFor="cv-folds" className="text-sm font-medium text-slate-700">
-                          Cross-Validation Folds
+                          Cross-Validation
                         </Label>
                         <Select
                           value={options.crossValidationFolds.toString()}
@@ -534,7 +652,31 @@ export default function Home() {
                         </Select>
                       </div>
 
-                      <div className="flex items-center space-x-2 pt-6">
+                      <div className="space-y-2">
+                        <Label htmlFor="ensemble-method" className="text-sm font-medium text-slate-700">
+                          Ensemble Method
+                        </Label>
+                        <Select
+                          value={options.ensembleMethod}
+                          onValueChange={(value: 'none' | 'voting' | 'stacking' | 'blending') => 
+                            setOptions(prev => ({ ...prev, ensembleMethod: value }))
+                          }
+                        >
+                          <SelectTrigger id="ensemble-method">
+                            <SelectValue placeholder="Select ensemble" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">No Ensemble</SelectItem>
+                            <SelectItem value="voting">Voting Ensemble</SelectItem>
+                            <SelectItem value="stacking">Stacking Ensemble</SelectItem>
+                            <SelectItem value="blending">Blending Ensemble</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div className="flex items-center space-x-2">
                         <Checkbox
                           id="hyperparameter-tuning"
                           checked={options.hyperparameterTuning}
@@ -543,22 +685,207 @@ export default function Home() {
                           }
                         />
                         <Label htmlFor="hyperparameter-tuning" className="text-sm text-slate-700">
-                          Enable Hyperparameter Tuning
+                          Hyperparameter Tuning (Optuna)
+                        </Label>
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="advanced-features"
+                          checked={options.includeAdvancedFeatureEngineering}
+                          onCheckedChange={(checked) => 
+                            setOptions(prev => ({ ...prev, includeAdvancedFeatureEngineering: checked as boolean }))
+                          }
+                        />
+                        <Label htmlFor="advanced-features" className="text-sm text-slate-700">
+                          Advanced Feature Engineering
+                        </Label>
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="auto-feature-selection"
+                          checked={options.autoFeatureSelection}
+                          onCheckedChange={(checked) => 
+                            setOptions(prev => ({ ...prev, autoFeatureSelection: checked as boolean }))
+                          }
+                        />
+                        <Label htmlFor="auto-feature-selection" className="text-sm text-slate-700">
+                          Automatic Feature Selection
+                        </Label>
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="explainability"
+                          checked={options.includeExplainability}
+                          onCheckedChange={(checked) => 
+                            setOptions(prev => ({ ...prev, includeExplainability: checked as boolean }))
+                          }
+                        />
+                        <Label htmlFor="explainability" className="text-sm text-slate-700">
+                          Model Explainability (SHAP)
                         </Label>
                       </div>
                     </div>
+                  </CollapsibleContent>
+                </Collapsible>
 
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="advanced-features"
-                        checked={options.includeAdvancedFeatureEngineering}
-                        onCheckedChange={(checked) => 
-                          setOptions(prev => ({ ...prev, includeAdvancedFeatureEngineering: checked as boolean }))
-                        }
-                      />
-                      <Label htmlFor="advanced-features" className="text-sm text-slate-700">
-                        Include Advanced Feature Engineering (polynomial, interactions, statistical features)
-                      </Label>
+                {/* Ultra-Advanced Options */}
+                <Collapsible open={showUltraAdvancedOptions} onOpenChange={setShowUltraAdvancedOptions}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="outline" className="w-full justify-between border-purple-200 hover:bg-purple-50">
+                      <div className="flex items-center space-x-2">
+                        <Beaker className="w-4 h-4 text-purple-600" />
+                        <span className="text-purple-700">Ultra-Advanced Options</span>
+                      </div>
+                      {showUltraAdvancedOptions ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-4 mt-4 p-4 bg-purple-50 rounded-lg">
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="outlier-detection" className="text-sm font-medium text-slate-700">
+                          Outlier Detection
+                        </Label>
+                        <Select
+                          value={options.outlierDetection}
+                          onValueChange={(value: 'none' | 'isolation-forest' | 'local-outlier-factor' | 'one-class-svm') => 
+                            setOptions(prev => ({ ...prev, outlierDetection: value }))
+                          }
+                        >
+                          <SelectTrigger id="outlier-detection">
+                            <SelectValue placeholder="Select method" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">No Detection</SelectItem>
+                            <SelectItem value="isolation-forest">Isolation Forest</SelectItem>
+                            <SelectItem value="local-outlier-factor">Local Outlier Factor</SelectItem>
+                            <SelectItem value="one-class-svm">One-Class SVM</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="dimensionality-reduction" className="text-sm font-medium text-slate-700">
+                          Dimensionality Reduction
+                        </Label>
+                        <Select
+                          value={options.dimensionalityReduction}
+                          onValueChange={(value: 'none' | 'pca' | 'tsne' | 'umap') => 
+                            setOptions(prev => ({ ...prev, dimensionalityReduction: value }))
+                          }
+                        >
+                          <SelectTrigger id="dimensionality-reduction">
+                            <SelectValue placeholder="Select method" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">No Reduction</SelectItem>
+                            <SelectItem value="pca">PCA</SelectItem>
+                            <SelectItem value="tsne">t-SNE</SelectItem>
+                            <SelectItem value="umap">UMAP</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="advanced-validation" className="text-sm font-medium text-slate-700">
+                          Validation Strategy
+                        </Label>
+                        <Select
+                          value={options.advancedValidation}
+                          onValueChange={(value: 'simple' | 'stratified' | 'time-series' | 'group' | 'adversarial') => 
+                            setOptions(prev => ({ ...prev, advancedValidation: value }))
+                          }
+                        >
+                          <SelectTrigger id="advanced-validation">
+                            <SelectValue placeholder="Select strategy" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="simple">Simple K-Fold</SelectItem>
+                            <SelectItem value="stratified">Stratified K-Fold</SelectItem>
+                            <SelectItem value="time-series">Time Series Split</SelectItem>
+                            <SelectItem value="group">Group K-Fold</SelectItem>
+                            <SelectItem value="adversarial">Adversarial Validation</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="optimization-objective" className="text-sm font-medium text-slate-700">
+                          Optimization Objective
+                        </Label>
+                        <Select
+                          value={options.optimizationObjective}
+                          onValueChange={(value: 'accuracy' | 'speed' | 'memory' | 'interpretability') => 
+                            setOptions(prev => ({ ...prev, optimizationObjective: value }))
+                          }
+                        >
+                          <SelectTrigger id="optimization-objective">
+                            <SelectValue placeholder="Select objective" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="accuracy">Maximum Accuracy</SelectItem>
+                            <SelectItem value="speed">Inference Speed</SelectItem>
+                            <SelectItem value="memory">Memory Efficiency</SelectItem>
+                            <SelectItem value="interpretability">Model Interpretability</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="deep-learning"
+                          checked={options.includeDeepLearning}
+                          onCheckedChange={(checked) => 
+                            setOptions(prev => ({ ...prev, includeDeepLearning: checked as boolean }))
+                          }
+                        />
+                        <Label htmlFor="deep-learning" className="text-sm text-slate-700">
+                          Deep Learning Integration
+                        </Label>
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="automl"
+                          checked={options.includeAutoML}
+                          onCheckedChange={(checked) => 
+                            setOptions(prev => ({ ...prev, includeAutoML: checked as boolean }))
+                          }
+                        />
+                        <Label htmlFor="automl" className="text-sm text-slate-700">
+                          AutoML Integration (FLAML)
+                        </Label>
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="data-augmentation"
+                          checked={options.dataAugmentation}
+                          onCheckedChange={(checked) => 
+                            setOptions(prev => ({ ...prev, dataAugmentation: checked as boolean }))
+                          }
+                        />
+                        <Label htmlFor="data-augmentation" className="text-sm text-slate-700">
+                          Data Augmentation
+                        </Label>
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="documentation"
+                          checked={options.generateDocumentation}
+                          onCheckedChange={(checked) => 
+                            setOptions(prev => ({ ...prev, generateDocumentation: checked as boolean }))
+                          }
+                        />
+                        <Label htmlFor="documentation" className="text-sm text-slate-700">
+                          Auto-Generated Documentation
+                        </Label>
+                      </div>
                     </div>
                   </CollapsibleContent>
                 </Collapsible>
@@ -566,17 +893,17 @@ export default function Home() {
                 <Button 
                   onClick={handleGenerate}
                   disabled={generationStatus.status === 'generating'}
-                  className="w-full h-12 text-base bg-indigo-500 hover:bg-indigo-600 transition-all duration-200"
+                  className="w-full h-12 text-base bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 transition-all duration-200"
                 >
                   {generationStatus.status === 'generating' ? (
                     <>
                       <Zap className="w-4 h-4 mr-2 animate-spin" />
-                      Generating Advanced Notebook...
+                      Generating Ultra-Advanced Notebook...
                     </>
                   ) : (
                     <>
-                      <FileText className="w-4 h-4 mr-2" />
-                      Generate Advanced Kaggle Notebook
+                      <Beaker className="w-4 h-4 mr-2" />
+                      Generate Ultra-Advanced Kaggle Notebook
                     </>
                   )}
                 </Button>
@@ -623,27 +950,27 @@ export default function Home() {
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
                     <CheckCircle className="w-5 h-5 text-green-500" />
-                    <span>Advanced Kaggle Notebook Ready!</span>
+                    <span>Ultra-Advanced Kaggle Notebook Ready!</span>
                   </CardTitle>
                   <CardDescription>
-                    Your competition-ready notebook with advanced configurations is generated
+                    Your cutting-edge, production-ready notebook with advanced ML techniques
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="bg-slate-50 rounded-lg p-4">
-                    <h4 className="text-sm font-medium text-slate-700 mb-3">Advanced Notebook Features</h4>
+                    <h4 className="text-sm font-medium text-slate-700 mb-3">Ultra-Advanced Features</h4>
                     <div className="grid grid-cols-2 gap-3 text-sm">
                       <div className="flex items-center space-x-2">
                         <Cpu className="w-4 h-4 text-indigo-500" />
                         <span>{currentProject.options.selectedModel} model</span>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Target className="w-4 h-4 text-green-500" />
+                        <Database className="w-4 h-4 text-green-500" />
                         <span>{currentProject.options.missingValueStrategy} imputation</span>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <BarChart3 className="w-4 h-4 text-blue-500" />
-                        <span>{currentProject.options.crossValidationFolds}-fold CV</span>
+                        <Activity className="w-4 h-4 text-blue-500" />
+                        <span>{currentProject.options.crossValidationFolds}-fold {currentProject.options.advancedValidation} CV</span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <Layers className="w-4 h-4 text-purple-500" />
@@ -654,34 +981,54 @@ export default function Home() {
                         <span>{currentProject.options.hyperparameterTuning ? 'Auto-tuned' : 'Default'} params</span>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <FileText className="w-4 h-4 text-teal-500" />
-                        <span>Single .ipynb file</span>
+                        <Workflow className="w-4 h-4 text-pink-500" />
+                        <span>{currentProject.options.ensembleMethod !== 'none' ? currentProject.options.ensembleMethod : 'Single'} model</span>
                       </div>
+                      {currentProject.options.includeExplainability && (
+                        <div className="flex items-center space-x-2">
+                          <Microscope className="w-4 h-4 text-teal-500" />
+                          <span>SHAP explainability</span>
+                        </div>
+                      )}
+                      {currentProject.options.includeAutoML && (
+                        <div className="flex items-center space-x-2">
+                          <Brain className="w-4 h-4 text-red-500" />
+                          <span>AutoML integration</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                   
-                  <div className="flex items-center justify-between text-sm text-slate-600 bg-indigo-50 p-3 rounded-lg">
-                    <div>
-                      <span className="font-medium">Expected Score: </span>
-                      <span className="text-indigo-700">{currentProject.notebook.expectedScore}</span>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-indigo-50 p-3 rounded-lg">
+                      <div className="text-sm text-slate-600">Expected Score</div>
+                      <div className="text-lg font-semibold text-indigo-700">{currentProject.notebook.expectedScore}</div>
                     </div>
-                    <div>
-                      <span className="font-medium">Competition: </span>
-                      <span>{currentProject.competitionName}</span>
+                    <div className="bg-purple-50 p-3 rounded-lg">
+                      <div className="text-sm text-slate-600">Complexity Level</div>
+                      <div className="text-lg font-semibold text-purple-700 capitalize">{currentProject.notebook.complexity}</div>
+                    </div>
+                    <div className="bg-green-50 p-3 rounded-lg">
+                      <div className="text-sm text-slate-600">Runtime</div>
+                      <div className="text-lg font-semibold text-green-700">{currentProject.notebook.estimatedRuntime}</div>
+                    </div>
+                    <div className="bg-orange-50 p-3 rounded-lg">
+                      <div className="text-sm text-slate-600">Memory Usage</div>
+                      <div className="text-lg font-semibold text-orange-700">{currentProject.notebook.memoryUsage}</div>
                     </div>
                   </div>
 
                   <div className="space-y-3">
                     <Button 
                       onClick={handleDownload}
-                      className="w-full h-12 bg-green-500 hover:bg-green-600 transition-all duration-200"
+                      className="w-full h-12 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 transition-all duration-200"
                     >
                       <Download className="w-4 h-4 mr-2" />
-                      Download Advanced Kaggle Notebook (.ipynb)
+                      Download Ultra-Advanced Notebook (.ipynb)
                     </Button>
                     
                     <div className="text-xs text-slate-500 text-center">
-                      💡 Upload this notebook directly to Kaggle and run all cells to generate your submission!
+                      🚀 Upload this notebook directly to Kaggle and run all cells to generate your submission!
                     </div>
                   </div>
                 </CardContent>
@@ -699,7 +1046,7 @@ export default function Home() {
                   <span>Popular Competitions</span>
                 </CardTitle>
                 <CardDescription>
-                  Quick-start with these beginner-friendly competitions
+                  Quick-start with these competitions
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -794,30 +1141,38 @@ export default function Home() {
               </Card>
             )}
 
-            {/* Advanced Features Card */}
-            <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+            {/* Ultra-Advanced Features Card */}
+            <Card className="shadow-lg border-0 bg-gradient-to-br from-purple-50 to-pink-50">
               <CardHeader>
-                <CardTitle className="text-lg">Advanced Features</CardTitle>
+                <CardTitle className="text-lg flex items-center space-x-2">
+                  <Beaker className="w-5 h-5 text-purple-600" />
+                  <span>Ultra-Advanced Features</span>
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-600">Model Selection</span>
-                  <Badge variant="outline">6+ Algorithms</Badge>
+                  <span className="text-sm text-slate-600">Ensemble Methods</span>
+                  <Badge variant="outline" className="bg-purple-100 text-purple-700">Voting • Stacking • Blending</Badge>
                 </div>
                 <Separator />
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-600">Feature Engineering</span>
-                  <Badge variant="outline">Polynomial + Interactions</Badge>
+                  <span className="text-sm text-slate-600">AutoML Integration</span>
+                  <Badge variant="outline" className="bg-blue-100 text-blue-700">FLAML • Auto-sklearn</Badge>
                 </div>
                 <Separator />
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-600">Hyperparameter Tuning</span>
-                  <Badge variant="outline">Auto-optimization</Badge>
+                  <span className="text-sm text-slate-600">Model Explainability</span>
+                  <Badge variant="outline" className="bg-green-100 text-green-700">SHAP • Permutation</Badge>
                 </div>
                 <Separator />
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-600">Cross-Validation</span>
-                  <Badge variant="outline">3-10 fold CV</Badge>
+                  <span className="text-sm text-slate-600">Advanced Validation</span>
+                  <Badge variant="outline" className="bg-orange-100 text-orange-700">Adversarial • Time-Series</Badge>
+                </div>
+                <Separator />
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-slate-600">Deep Learning</span>
+                  <Badge variant="outline" className="bg-red-100 text-red-700">Neural Networks • CNNs</Badge>
                 </div>
               </CardContent>
             </Card>
@@ -832,20 +1187,22 @@ export default function Home() {
             <div>
               <div className="flex items-center space-x-2 mb-4">
                 <Rocket className="w-5 h-5 text-indigo-500" />
-                <span className="font-semibold text-slate-900">Kaggle Launchpad</span>
+                <span className="font-semibold text-slate-900">Kaggle Launchpad Ultra</span>
               </div>
               <p className="text-sm text-slate-600">
-                Generate advanced, ready-to-run Kaggle notebooks with customizable models, 
-                feature engineering, and hyperparameter tuning. Zero setup, maximum productivity.
+                Generate ultra-advanced, production-ready Kaggle notebooks with cutting-edge ML techniques, 
+                ensemble methods, AutoML integration, and model explainability.
               </p>
             </div>
             <div>
-              <h4 className="font-semibold text-slate-900 mb-4">Advanced Features</h4>
+              <h4 className="font-semibold text-slate-900 mb-4">Ultra-Advanced Features</h4>
               <ul className="space-y-2 text-sm text-slate-600">
-                <li>• Multiple ML algorithms</li>
-                <li>• Advanced feature engineering</li>
+                <li>• Ensemble methods (voting, stacking, blending)</li>
+                <li>• AutoML integration with FLAML</li>
+                <li>• Model explainability with SHAP</li>
+                <li>• Advanced validation strategies</li>
+                <li>• Deep learning integration</li>
                 <li>• Hyperparameter optimization</li>
-                <li>• Cross-validation strategies</li>
               </ul>
             </div>
             <div>
@@ -869,8 +1226,8 @@ export default function Home() {
           </div>
           <Separator className="my-6" />
           <div className="flex justify-between items-center text-sm text-slate-500">
-            <p>&copy; 2025 Kaggle Launchpad. All rights reserved.</p>
-            <p>Built for the Kaggle community 🚀</p>
+            <p>&copy; 2025 Kaggle Launchpad Ultra. All rights reserved.</p>
+            <p>Ultra-Advanced AI for the Kaggle community 🚀</p>
           </div>
         </div>
       </footer>

@@ -14,6 +14,20 @@ export interface ProjectData {
     includeAdvancedFeatureEngineering: boolean;
     crossValidationFolds: number;
     hyperparameterTuning: boolean;
+    // Ultra-advanced options
+    ensembleMethod: 'none' | 'voting' | 'stacking' | 'blending';
+    autoFeatureSelection: boolean;
+    includeDeepLearning: boolean;
+    dataAugmentation: boolean;
+    outlierDetection: 'none' | 'isolation-forest' | 'local-outlier-factor' | 'one-class-svm';
+    dimensionalityReduction: 'none' | 'pca' | 'tsne' | 'umap';
+    advancedValidation: 'simple' | 'stratified' | 'time-series' | 'group' | 'adversarial';
+    includeExplainability: boolean;
+    optimizationObjective: 'accuracy' | 'speed' | 'memory' | 'interpretability';
+    includeAutoML: boolean;
+    generateDocumentation: boolean;
+    includeUnitTests: boolean;
+    codeOptimization: 'none' | 'basic' | 'advanced';
   };
   files?: GeneratedFile[];
   notebook?: KaggleNotebook;
@@ -32,6 +46,10 @@ export interface KaggleNotebook {
   content: string;
   expectedScore?: string;
   description: string;
+  complexity: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+  estimatedRuntime: string;
+  memoryUsage: string;
+  techniques: string[];
 }
 
 const STORAGE_KEY = 'kaggle_launchpad_projects';
