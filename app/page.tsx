@@ -8,6 +8,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
 import { 
   Rocket, 
@@ -28,7 +31,13 @@ import {
   Code,
   BookOpen,
   Target,
-  Sparkles
+  Sparkles,
+  Settings,
+  ChevronDown,
+  ChevronUp,
+  Cpu,
+  Layers,
+  Sliders
 } from 'lucide-react';
 import { NotebookGenerator } from '@/lib/notebook-generator';
 import { ClientStorage, ProjectData } from '@/lib/client-storage';
@@ -37,6 +46,11 @@ interface ProjectGenerationOptions {
   includeEDA: boolean;
   includeBaseline: boolean;
   initializeGit: boolean;
+  selectedModel: string;
+  missingValueStrategy: 'median' | 'mean' | 'mode' | 'advanced';
+  includeAdvancedFeatureEngineering: boolean;
+  crossValidationFolds: number;
+  hyperparameterTuning: boolean;
 }
 
 interface GenerationStatus {
@@ -55,12 +69,45 @@ const popularCompetitions = [
   { name: 'Natural Language Processing', url: 'nlp-getting-started', difficulty: 'Intermediate', icon: '💬', score: '0.80-0.85' },
 ];
 
+const getAvailableModels = (competitionType: string) => {
+  const modelMap: Record<string, string[]> = {
+    'classification': ['XGBoost', 'RandomForest', 'LogisticRegression', 'LightGBM', 'CatBoost', 'SVM'],
+    'regression': ['XGBoost', 'RandomForest', 'LinearRegression', 'LightGBM', 'CatBoost', 'SVR'],
+    'nlp': ['LogisticRegression', 'RandomForest', 'XGBoost', 'NaiveBayes', 'SVM'],
+    'computer-vision': ['RandomForest', 'XGBoost', 'CNN', 'ResNet', 'EfficientNet'],
+    'other': ['XGBoost', 'RandomForest', 'LogisticRegression', 'LightGBM']
+  };
+  return modelMap[competitionType] || modelMap['other'];
+};
+
+const detectCompetitionType = (name: string): string => {
+  const lowerName = name.toLowerCase();
+  
+  if (lowerName.includes('nlp') || lowerName.includes('sentiment') || lowerName.includes('text')) {
+    return 'nlp';
+  }
+  if (lowerName.includes('image') || lowerName.includes('vision') || lowerName.includes('digit')) {
+    return 'computer-vision';
+  }
+  if (lowerName.includes('price') || lowerName.includes('sales') || lowerName.includes('revenue')) {
+    return 'regression';
+  }
+  return 'classification';
+};
+
 export default function Home() {
   const [competitionInput, setCompetitionInput] = useState('');
+  const [competitionType, setCompetitionType] = useState('classification');
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   const [options, setOptions] = useState<ProjectGenerationOptions>({
     includeEDA: true,
     includeBaseline: true,
     initializeGit: false,
+    selectedModel: 'XGBoost',
+    missingValueStrategy: 'median',
+    includeAdvancedFeatureEngineering: false,
+    crossValidationFolds: 5,
+    hyperparameterTuning: false,
   });
   const [generationStatus, setGenerationStatus] = useState<GenerationStatus>({
     status: 'idle',
@@ -74,6 +121,18 @@ export default function Home() {
   useEffect(() => {
     loadRecentProjects();
   }, []);
+
+  // Update available models when competition input changes
+  useEffect(() => {
+    if (competitionInput) {
+      const detectedType = detectCompetitionType(competitionInput);
+      setCompetitionType(detectedType);
+      const availableModels = getAvailableModels(detectedType);
+      if (!availableModels.includes(options.selectedModel)) {
+        setOptions(prev => ({ ...prev, selectedModel: availableModels[0] }));
+      }
+    }
+  }, [competitionInput, options.selectedModel]);
 
   const loadRecentProjects = () => {
     try {
@@ -94,10 +153,11 @@ export default function Home() {
 
   const simulateGeneration = async (projectId: string, competitionName: string, options: ProjectGenerationOptions) => {
     const steps = [
-      { step: 'Analyzing competition type...', progress: 20, delay: 800 },
-      { step: 'Generating Kaggle-optimized notebook...', progress: 50, delay: 1200 },
-      { step: 'Adding EDA and preprocessing...', progress: 75, delay: 1000 },
-      { step: 'Finalizing model and submission code...', progress: 95, delay: 800 },
+      { step: 'Analyzing competition type...', progress: 15, delay: 800 },
+      { step: 'Configuring advanced model settings...', progress: 30, delay: 1000 },
+      { step: 'Generating optimized Kaggle notebook...', progress: 60, delay: 1500 },
+      { step: 'Adding advanced feature engineering...', progress: 80, delay: 1200 },
+      { step: 'Finalizing model and evaluation code...', progress: 95, delay: 800 },
     ];
 
     try {
@@ -123,6 +183,11 @@ export default function Home() {
       const notebook = await NotebookGenerator.generateKaggleNotebook(competitionName, {
         includeEDA: options.includeEDA,
         includeBaseline: options.includeBaseline,
+        selectedModel: options.selectedModel,
+        missingValueStrategy: options.missingValueStrategy,
+        includeAdvancedFeatureEngineering: options.includeAdvancedFeatureEngineering,
+        crossValidationFolds: options.crossValidationFolds,
+        hyperparameterTuning: options.hyperparameterTuning,
       });
       
       // Complete the project
@@ -131,7 +196,7 @@ export default function Home() {
         competitionName,
         status: 'completed',
         progress: 100,
-        currentStep: 'Kaggle notebook ready!',
+        currentStep: 'Advanced Kaggle notebook ready!',
         options,
         notebook,
         createdAt: new Date().toISOString(),
@@ -143,11 +208,11 @@ export default function Home() {
       setGenerationStatus({
         status: 'completed',
         progress: 100,
-        currentStep: 'Kaggle notebook ready!',
+        currentStep: 'Advanced Kaggle notebook ready!',
         projectId,
       });
 
-      toast.success('Your Kaggle notebook is ready for download!');
+      toast.success(`Your advanced ${options.selectedModel} notebook is ready for download!`);
       loadRecentProjects();
 
     } catch (error) {
@@ -189,11 +254,11 @@ export default function Home() {
       id: projectId,
       competitionName,
       status: 'generating',
-      progress: 10,
-      currentStep: 'Initializing notebook generation...',
+      progress: 5,
+      currentStep: 'Initializing advanced notebook generation...',
       options,
       createdAt: new Date().toISOString(),
-      estimatedCompletion: new Date(Date.now() + 2 * 60 * 1000).toISOString(),
+      estimatedCompletion: new Date(Date.now() + 3 * 60 * 1000).toISOString(),
     };
 
     ClientStorage.saveProject(initialProject);
@@ -201,12 +266,12 @@ export default function Home() {
 
     setGenerationStatus({ 
       status: 'generating', 
-      progress: 10, 
-      currentStep: 'Initializing notebook generation...',
+      progress: 5, 
+      currentStep: 'Initializing advanced notebook generation...',
       projectId,
     });
     
-    toast.success('Kaggle notebook generation started!');
+    toast.success(`Advanced ${options.selectedModel} notebook generation started!`);
 
     // Start generation simulation
     simulateGeneration(projectId, competitionName, options);
@@ -229,7 +294,7 @@ export default function Home() {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
       
-      toast.success('Kaggle notebook downloaded!');
+      toast.success('Advanced Kaggle notebook downloaded!');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Download failed';
       toast.error(errorMessage);
@@ -267,6 +332,8 @@ export default function Home() {
     });
   };
 
+  const availableModels = getAvailableModels(competitionType);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50">
       {/* Header */}
@@ -279,7 +346,7 @@ export default function Home() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-slate-900">Kaggle Launchpad</h1>
-                <p className="text-sm text-slate-600">Single-notebook Kaggle competition generator</p>
+                <p className="text-sm text-slate-600">Advanced single-notebook Kaggle competition generator</p>
               </div>
             </div>
             <div className="flex items-center space-x-3">
@@ -289,7 +356,7 @@ export default function Home() {
               </Badge>
               <Badge variant="secondary" className="bg-indigo-100 text-indigo-700">
                 <Target className="w-3 h-3 mr-1" />
-                Kaggle-Optimized
+                Advanced Config
               </Badge>
             </div>
           </div>
@@ -305,24 +372,24 @@ export default function Home() {
               <CardContent className="p-8">
                 <div className="flex items-center space-x-3 mb-4">
                   <Sparkles className="w-8 h-8" />
-                  <h2 className="text-2xl font-bold">Kaggle-First Approach</h2>
+                  <h2 className="text-2xl font-bold">Advanced Kaggle-First Approach</h2>
                 </div>
                 <p className="text-lg opacity-90 mb-4">
-                  Generate complete, ready-to-run Kaggle notebooks that work directly in the Kaggle environment. 
-                  No setup required - just copy, paste, and submit!
+                  Generate highly customized, competition-ready Kaggle notebooks with advanced model configurations, 
+                  feature engineering, and hyperparameter tuning. Zero setup required!
                 </p>
                 <div className="flex items-center space-x-6 text-sm">
                   <div className="flex items-center space-x-2">
-                    <FileText className="w-4 h-4" />
-                    <span>Single Notebook</span>
+                    <Cpu className="w-4 h-4" />
+                    <span>Model Selection</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Zap className="w-4 h-4" />
-                    <span>Zero Setup</span>
+                    <Layers className="w-4 h-4" />
+                    <span>Advanced Features</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Target className="w-4 h-4" />
-                    <span>Competition Ready</span>
+                    <Sliders className="w-4 h-4" />
+                    <span>Hyperparameter Tuning</span>
                   </div>
                 </div>
               </CardContent>
@@ -333,17 +400,17 @@ export default function Home() {
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Play className="w-5 h-5 text-indigo-500" />
-                  <span>Generate Your Kaggle Notebook</span>
+                  <span>Generate Your Advanced Kaggle Notebook</span>
                 </CardTitle>
                 <CardDescription>
-                  Enter a Kaggle competition name or URL to generate a complete, ready-to-run notebook
+                  Enter a Kaggle competition name or URL to generate a customized, ready-to-run notebook
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-2">
-                  <label htmlFor="competition" className="text-sm font-medium text-slate-700">
+                  <Label htmlFor="competition" className="text-sm font-medium text-slate-700">
                     Competition Name or URL
-                  </label>
+                  </Label>
                   <Input
                     id="competition"
                     placeholder="Example: titanic or https://www.kaggle.com/competitions/titanic"
@@ -351,10 +418,15 @@ export default function Home() {
                     onChange={(e) => setCompetitionInput(e.target.value)}
                     className="h-12 text-base"
                   />
+                  {competitionInput && (
+                    <div className="text-xs text-slate-500">
+                      Detected type: <span className="font-medium capitalize">{competitionType}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-4">
-                  <h4 className="text-sm font-medium text-slate-700">Notebook Options</h4>
+                  <h4 className="text-sm font-medium text-slate-700">Basic Options</h4>
                   <div className="grid sm:grid-cols-2 gap-4">
                     <div className="flex items-center space-x-2">
                       <Checkbox
@@ -364,10 +436,10 @@ export default function Home() {
                           setOptions(prev => ({ ...prev, includeEDA: checked as boolean }))
                         }
                       />
-                      <label htmlFor="eda" className="text-sm text-slate-700 flex items-center space-x-1">
+                      <Label htmlFor="eda" className="text-sm text-slate-700 flex items-center space-x-1">
                         <BarChart3 className="w-4 h-4" />
-                        <span>Include EDA Section</span>
-                      </label>
+                        <span>Include Advanced EDA</span>
+                      </Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Checkbox
@@ -377,13 +449,119 @@ export default function Home() {
                           setOptions(prev => ({ ...prev, includeBaseline: checked as boolean }))
                         }
                       />
-                      <label htmlFor="baseline" className="text-sm text-slate-700 flex items-center space-x-1">
+                      <Label htmlFor="baseline" className="text-sm text-slate-700 flex items-center space-x-1">
                         <Brain className="w-4 h-4" />
-                        <span>Include Baseline Model</span>
-                      </label>
+                        <span>Include Model Training</span>
+                      </Label>
                     </div>
                   </div>
                 </div>
+
+                {/* Advanced Options */}
+                <Collapsible open={showAdvancedOptions} onOpenChange={setShowAdvancedOptions}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="outline" className="w-full justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Settings className="w-4 h-4" />
+                        <span>Advanced Configuration</span>
+                      </div>
+                      {showAdvancedOptions ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-4 mt-4">
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="model-select" className="text-sm font-medium text-slate-700">
+                          Model Selection
+                        </Label>
+                        <Select
+                          value={options.selectedModel}
+                          onValueChange={(value) => setOptions(prev => ({ ...prev, selectedModel: value }))}
+                        >
+                          <SelectTrigger id="model-select">
+                            <SelectValue placeholder="Select model" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableModels.map((model) => (
+                              <SelectItem key={model} value={model}>
+                                {model}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="missing-strategy" className="text-sm font-medium text-slate-700">
+                          Missing Value Strategy
+                        </Label>
+                        <Select
+                          value={options.missingValueStrategy}
+                          onValueChange={(value: 'median' | 'mean' | 'mode' | 'advanced') => 
+                            setOptions(prev => ({ ...prev, missingValueStrategy: value }))
+                          }
+                        >
+                          <SelectTrigger id="missing-strategy">
+                            <SelectValue placeholder="Select strategy" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="median">Median Imputation</SelectItem>
+                            <SelectItem value="mean">Mean Imputation</SelectItem>
+                            <SelectItem value="mode">Mode Imputation</SelectItem>
+                            <SelectItem value="advanced">Advanced (KNN + Iterative)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="cv-folds" className="text-sm font-medium text-slate-700">
+                          Cross-Validation Folds
+                        </Label>
+                        <Select
+                          value={options.crossValidationFolds.toString()}
+                          onValueChange={(value) => 
+                            setOptions(prev => ({ ...prev, crossValidationFolds: parseInt(value) }))
+                          }
+                        >
+                          <SelectTrigger id="cv-folds">
+                            <SelectValue placeholder="Select folds" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="3">3-fold</SelectItem>
+                            <SelectItem value="5">5-fold</SelectItem>
+                            <SelectItem value="10">10-fold</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="flex items-center space-x-2 pt-6">
+                        <Checkbox
+                          id="hyperparameter-tuning"
+                          checked={options.hyperparameterTuning}
+                          onCheckedChange={(checked) => 
+                            setOptions(prev => ({ ...prev, hyperparameterTuning: checked as boolean }))
+                          }
+                        />
+                        <Label htmlFor="hyperparameter-tuning" className="text-sm text-slate-700">
+                          Enable Hyperparameter Tuning
+                        </Label>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="advanced-features"
+                        checked={options.includeAdvancedFeatureEngineering}
+                        onCheckedChange={(checked) => 
+                          setOptions(prev => ({ ...prev, includeAdvancedFeatureEngineering: checked as boolean }))
+                        }
+                      />
+                      <Label htmlFor="advanced-features" className="text-sm text-slate-700">
+                        Include Advanced Feature Engineering (polynomial, interactions, statistical features)
+                      </Label>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
 
                 <Button 
                   onClick={handleGenerate}
@@ -393,12 +571,12 @@ export default function Home() {
                   {generationStatus.status === 'generating' ? (
                     <>
                       <Zap className="w-4 h-4 mr-2 animate-spin" />
-                      Generating Notebook...
+                      Generating Advanced Notebook...
                     </>
                   ) : (
                     <>
                       <FileText className="w-4 h-4 mr-2" />
-                      Generate Kaggle Notebook
+                      Generate Advanced Kaggle Notebook
                     </>
                   )}
                 </Button>
@@ -445,31 +623,39 @@ export default function Home() {
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
                     <CheckCircle className="w-5 h-5 text-green-500" />
-                    <span>Kaggle Notebook Ready!</span>
+                    <span>Advanced Kaggle Notebook Ready!</span>
                   </CardTitle>
                   <CardDescription>
-                    Your competition-ready notebook is generated and ready for Kaggle
+                    Your competition-ready notebook with advanced configurations is generated
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="bg-slate-50 rounded-lg p-4">
-                    <h4 className="text-sm font-medium text-slate-700 mb-3">Notebook Features</h4>
+                    <h4 className="text-sm font-medium text-slate-700 mb-3">Advanced Notebook Features</h4>
                     <div className="grid grid-cols-2 gap-3 text-sm">
                       <div className="flex items-center space-x-2">
-                        <FileText className="w-4 h-4 text-indigo-500" />
-                        <span>Single .ipynb file</span>
+                        <Cpu className="w-4 h-4 text-indigo-500" />
+                        <span>{currentProject.options.selectedModel} model</span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <Target className="w-4 h-4 text-green-500" />
-                        <span>Kaggle-optimized paths</span>
+                        <span>{currentProject.options.missingValueStrategy} imputation</span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <BarChart3 className="w-4 h-4 text-blue-500" />
-                        <span>Complete EDA section</span>
+                        <span>{currentProject.options.crossValidationFolds}-fold CV</span>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Brain className="w-4 h-4 text-purple-500" />
-                        <span>Baseline model included</span>
+                        <Layers className="w-4 h-4 text-purple-500" />
+                        <span>{currentProject.options.includeAdvancedFeatureEngineering ? 'Advanced' : 'Basic'} features</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Sliders className="w-4 h-4 text-orange-500" />
+                        <span>{currentProject.options.hyperparameterTuning ? 'Auto-tuned' : 'Default'} params</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <FileText className="w-4 h-4 text-teal-500" />
+                        <span>Single .ipynb file</span>
                       </div>
                     </div>
                   </div>
@@ -491,7 +677,7 @@ export default function Home() {
                       className="w-full h-12 bg-green-500 hover:bg-green-600 transition-all duration-200"
                     >
                       <Download className="w-4 h-4 mr-2" />
-                      Download Kaggle Notebook (.ipynb)
+                      Download Advanced Kaggle Notebook (.ipynb)
                     </Button>
                     
                     <div className="text-xs text-slate-500 text-center">
@@ -594,6 +780,9 @@ export default function Home() {
                               {project.status}
                             </Badge>
                             <span className="text-xs text-slate-500">
+                              {project.options.selectedModel}
+                            </span>
+                            <span className="text-xs text-slate-500">
                               {formatDate(project.createdAt)}
                             </span>
                           </div>
@@ -605,30 +794,30 @@ export default function Home() {
               </Card>
             )}
 
-            {/* Benefits Card */}
+            {/* Advanced Features Card */}
             <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
               <CardHeader>
-                <CardTitle className="text-lg">Why Single Notebooks?</CardTitle>
+                <CardTitle className="text-lg">Advanced Features</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-600">Zero setup time</span>
-                  <Badge variant="outline">Copy & Run</Badge>
+                  <span className="text-sm text-slate-600">Model Selection</span>
+                  <Badge variant="outline">6+ Algorithms</Badge>
                 </div>
                 <Separator />
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-600">Kaggle-optimized</span>
-                  <Badge variant="outline">Built-in paths</Badge>
+                  <span className="text-sm text-slate-600">Feature Engineering</span>
+                  <Badge variant="outline">Polynomial + Interactions</Badge>
                 </div>
                 <Separator />
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-600">Complete solution</span>
-                  <Badge variant="outline">EDA to submission</Badge>
+                  <span className="text-sm text-slate-600">Hyperparameter Tuning</span>
+                  <Badge variant="outline">Auto-optimization</Badge>
                 </div>
                 <Separator />
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-600">Expected scores</span>
-                  <Badge variant="outline">Performance targets</Badge>
+                  <span className="text-sm text-slate-600">Cross-Validation</span>
+                  <Badge variant="outline">3-10 fold CV</Badge>
                 </div>
               </CardContent>
             </Card>
@@ -646,17 +835,17 @@ export default function Home() {
                 <span className="font-semibold text-slate-900">Kaggle Launchpad</span>
               </div>
               <p className="text-sm text-slate-600">
-                Generate ready-to-run Kaggle notebooks that work directly in the Kaggle environment. 
-                Zero setup, maximum productivity.
+                Generate advanced, ready-to-run Kaggle notebooks with customizable models, 
+                feature engineering, and hyperparameter tuning. Zero setup, maximum productivity.
               </p>
             </div>
             <div>
-              <h4 className="font-semibold text-slate-900 mb-4">Features</h4>
+              <h4 className="font-semibold text-slate-900 mb-4">Advanced Features</h4>
               <ul className="space-y-2 text-sm text-slate-600">
-                <li>• Single notebook generation</li>
-                <li>• Kaggle-optimized code</li>
-                <li>• Competition-specific templates</li>
-                <li>• Expected performance scores</li>
+                <li>• Multiple ML algorithms</li>
+                <li>• Advanced feature engineering</li>
+                <li>• Hyperparameter optimization</li>
+                <li>• Cross-validation strategies</li>
               </ul>
             </div>
             <div>

@@ -9,6 +9,11 @@ export interface ProjectData {
     includeEDA: boolean;
     includeBaseline: boolean;
     initializeGit: boolean;
+    selectedModel: string;
+    missingValueStrategy: 'median' | 'mean' | 'mode' | 'advanced';
+    includeAdvancedFeatureEngineering: boolean;
+    crossValidationFolds: number;
+    hyperparameterTuning: boolean;
   };
   files?: GeneratedFile[];
   notebook?: KaggleNotebook;
