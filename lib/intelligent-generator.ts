@@ -1,5 +1,6 @@
 import { KaggleLaunchpadAI, CompetitionIntelligence } from './ai-agent';
 import { ProjectData } from './client-storage';
+import { ProjectWorkflowManager, WorkflowFactory, WorkflowContext } from './project-workflow';
 
 export interface IntelligentGenerationOptions extends ProjectData['options'] {
   competitionUrl: string;
@@ -22,75 +23,50 @@ export class IntelligentProjectGenerator {
   ): Promise<ProjectData> {
     const projectId = `project_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
-    let project: ProjectData = {
-      id: projectId,
-      competitionName,
-      status: 'generating',
-      progress: 0,
-      currentStep: 'Analyzing competition...',
-      options,
-      createdAt: new Date().toISOString()
-    };
-
     try {
-      // Step 1: Analyze competition (20%)
-      project.currentStep = 'Analyzing competition and gathering intelligence...';
-      project.progress = 20;
-      
-      const intelligence = await this.ai.analyzeCompetition(options.competitionUrl);
-      
-      // Step 2: Gather latest practices (40%)
-      project.currentStep = 'Gathering latest ML practices and techniques...';
-      project.progress = 40;
-      
-      if (options.useLatestPractices) {
-        await this.ai.gatherLatestPractices(intelligence.competitionType);
-      }
-      
-      // Step 3: Generate optimized code (70%)
-      project.currentStep = 'Generating optimized code with AI insights...';
-      project.progress = 70;
-      
-      const generatedCode = await this.ai.generateOptimizedCode(intelligence, options);
-      
-      // Step 4: Create enhanced project structure (90%)
-      project.currentStep = 'Creating enhanced project structure...';
-      project.progress = 90;
-      
-      const enhancedFiles = await this.createEnhancedProjectStructure(
-        intelligence,
-        generatedCode,
+      // Create and initialize workflow
+      const workflow = await WorkflowFactory.createProjectWorkflow(
+        this.ai,
+        projectId,
+        competitionName,
         options
       );
+
+      // Execute the workflow
+      const result = await workflow.executeWorkflow();
       
-      // Step 5: Finalize (100%)
-      project.currentStep = 'Finalizing project...';
-      project.progress = 100;
-      project.status = 'completed';
-      project.files = enhancedFiles;
+      // Clean up workflow from active workflows
+      WorkflowFactory.removeWorkflow(projectId);
       
-      // Add intelligent recommendations
-      project.notebook = {
-        path: 'notebooks/intelligent_analysis.ipynb',
-        content: this.generateIntelligentNotebook(intelligence, generatedCode),
-        expectedScore: generatedCode.estimatedScore,
-        description: `AI-generated analysis for ${intelligence.competitionType} competition`,
-        complexity: intelligence.estimatedDifficulty,
-        estimatedRuntime: this.estimateRuntime(intelligence),
-        memoryUsage: this.estimateMemoryUsage(intelligence),
-        techniques: this.extractTechniques(intelligence, generatedCode)
-      };
-      
-      return project;
+      return result;
       
     } catch (error) {
-      project.status = 'error';
-      project.error = error instanceof Error ? error.message : 'Unknown error occurred';
-      return project;
+      console.error('Project generation failed:', error);
+      
+      // Try to get the workflow to update its state
+      const workflow = WorkflowFactory.getWorkflow(projectId);
+      if (workflow) {
+        await workflow.fail(error instanceof Error ? error.message : 'Unknown error occurred');
+        WorkflowFactory.removeWorkflow(projectId);
+        return workflow['buildProjectData']();
+      }
+      
+      // Fallback: create a failed project data
+      return {
+        id: projectId,
+        competitionName,
+        status: 'failed' as any,
+        progress: 0,
+        currentStep: 'Project generation failed',
+        options,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+        createdAt: new Date().toISOString()
+      };
     }
   }
 
-  private async createEnhancedProjectStructure(
+  // Make these methods accessible for the workflow
+  async createEnhancedProjectStructure(
     intelligence: CompetitionIntelligence,
     generatedCode: any,
     options: IntelligentGenerationOptions
@@ -128,6 +104,70 @@ export class IntelligentProjectGenerator {
     });
     
     return files;
+  }
+
+  generateIntelligentNotebook(intelligence: CompetitionIntelligence, generatedCode: any): string {
+    return `{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# AI-Generated Competition Analysis\\n",
+    "\\n",
+    "**Competition Type:** ${intelligence.competitionType}\\n",
+    "**Estimated Difficulty:** ${intelligence.estimatedDifficulty}\\n",
+    "**Expected Score:** ${generatedCode.estimatedScore}\\n",
+    "\\n",
+    "This notebook was intelligently generated based on:\\n",
+    "- Analysis of ${intelligence.winningApproaches.length} winning approaches\\n",
+    "- Latest ML best practices from 2025\\n",
+    "- Competition-specific optimizations\\n",
+    "\\n",
+    "## Key Insights\\n",
+    "\\n",
+    "${intelligence.currentTrends.map(trend => `- ${trend}`).join('\\n')}"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "source": [
+    "# Import AI-optimized libraries\\n",
+    "import pandas as pd\\n",
+    "import numpy as np\\n",
+    "import matplotlib.pyplot as plt\\n",
+    "import seaborn as sns\\n",
+    "\\n",
+    "# Import intelligent modules\\n",
+    "from src.intelligent_preprocessing import intelligent_preprocessor\\n",
+    "from src.recommended_models import model_engine\\n",
+    "from src.evaluation_strategies import intelligent_evaluator\\n",
+    "from config.intelligent_config import config\\n",
+    "\\n",
+    "# Set up logging\\n",
+    "import logging\\n",
+    "logging.basicConfig(level=logging.INFO)\\n",
+    "logger = logging.getLogger(__name__)\\n",
+    "\\n",
+    "print('🤖 AI-Powered Kaggle Solution Initialized')\\n",
+    "print(f'Competition Type: {config.competition_type}')\\n",
+    "print(f'Target Type: {config.target_type}')\\n",
+    "print(f'Recommended Models: {config.recommended_models}')"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 4
+}`;
   }
 
   private generateIntelligentConfig(
@@ -590,64 +630,6 @@ class ModelRecommendationEngine:
     def _get_default_models(self) -> Dict[str, Any]:
         """Get default models when competition type is unclear"""
         return self._get_classification_models()
-    
-    def train_and_evaluate_models(self, X_train: pd.DataFrame, y_train: pd.Series, 
-                                X_val: pd.DataFrame, y_val: pd.Series) -> Dict[str, Dict[str, Any]]:
-        """Train and evaluate all recommended models"""
-        
-        models = self.get_recommended_models()
-        results = {}
-        
-        for name, model in models.items():
-            logger.info(f"Training {name}...")
-            
-            try:
-                # Train model
-                model.fit(X_train, y_train)
-                
-                # Make predictions
-                train_pred = model.predict(X_train)
-                val_pred = model.predict(X_val)
-                
-                # Calculate metrics
-                if self.target_type == 'classification':
-                    train_score = accuracy_score(y_train, train_pred)
-                    val_score = accuracy_score(y_val, val_pred)
-                    metric_name = 'accuracy'
-                else:
-                    train_score = np.sqrt(mean_squared_error(y_train, train_pred))
-                    val_score = np.sqrt(mean_squared_error(y_val, val_pred))
-                    metric_name = 'rmse'
-                
-                results[name] = {
-                    'model': model,
-                    'train_score': train_score,
-                    'val_score': val_score,
-                    'metric': metric_name,
-                    'predictions': val_pred
-                }
-                
-                logger.info(f"{name} - Train {metric_name}: {train_score:.4f}, Val {metric_name}: {val_score:.4f}")
-                
-            except Exception as e:
-                logger.error(f"Error training {name}: {e}")
-                continue
-        
-        return results
-    
-    def get_best_model(self, results: Dict[str, Dict[str, Any]]) -> Tuple[str, Any]:
-        """Get the best performing model"""
-        
-        if not results:
-            return None, None
-        
-        # Sort by validation score (higher is better for accuracy, lower for RMSE)
-        if self.target_type == 'classification':
-            best_name = max(results.keys(), key=lambda x: results[x]['val_score'])
-        else:
-            best_name = min(results.keys(), key=lambda x: results[x]['val_score'])
-        
-        return best_name, results[best_name]['model']
 
 # Global model recommendation engine
 model_engine = ModelRecommendationEngine()
@@ -686,190 +668,10 @@ class IntelligentEvaluator:
             return TimeSeriesSplit(n_splits=n_splits)
         else:
             return KFold(n_splits=n_splits, shuffle=True, random_state=42)
-    
-    def get_evaluation_metrics(self) -> Dict[str, Callable]:
-        """Get appropriate evaluation metrics for this competition"""
-        
-        if self.target_type == 'classification':
-            return {
-                'accuracy': accuracy_score,
-                'precision': lambda y_true, y_pred: precision_score(y_true, y_pred, average='weighted'),
-                'recall': lambda y_true, y_pred: recall_score(y_true, y_pred, average='weighted'),
-                'f1': lambda y_true, y_pred: f1_score(y_true, y_pred, average='weighted')
-            }
-        else:
-            return {
-                'rmse': lambda y_true, y_pred: np.sqrt(mean_squared_error(y_true, y_pred)),
-                'mae': mean_absolute_error,
-                'r2': r2_score
-            }
-    
-    def cross_validate_model(self, model, X: pd.DataFrame, y: pd.Series, 
-                           n_splits: int = 5) -> Dict[str, List[float]]:
-        """Perform cross-validation with appropriate strategy"""
-        
-        cv = self.get_cv_strategy(n_splits)
-        metrics = self.get_evaluation_metrics()
-        
-        results = {metric_name: [] for metric_name in metrics.keys()}
-        
-        for fold, (train_idx, val_idx) in enumerate(cv.split(X, y)):
-            logger.info(f"Processing fold {fold + 1}/{n_splits}")
-            
-            X_train_fold, X_val_fold = X.iloc[train_idx], X.iloc[val_idx]
-            y_train_fold, y_val_fold = y.iloc[train_idx], y.iloc[val_idx]
-            
-            # Train model
-            model.fit(X_train_fold, y_train_fold)
-            
-            # Make predictions
-            y_pred = model.predict(X_val_fold)
-            
-            # Calculate metrics
-            for metric_name, metric_func in metrics.items():
-                score = metric_func(y_val_fold, y_pred)
-                results[metric_name].append(score)
-        
-        # Log results
-        for metric_name, scores in results.items():
-            mean_score = np.mean(scores)
-            std_score = np.std(scores)
-            logger.info(f"{metric_name}: {mean_score:.4f} (+/- {std_score:.4f})")
-        
-        return results
-    
-    def evaluate_model_performance(self, model, X_train: pd.DataFrame, y_train: pd.Series,
-                                 X_val: pd.DataFrame, y_val: pd.Series) -> Dict[str, float]:
-        """Comprehensive model performance evaluation"""
-        
-        # Train model
-        model.fit(X_train, y_train)
-        
-        # Make predictions
-        train_pred = model.predict(X_train)
-        val_pred = model.predict(X_val)
-        
-        metrics = self.get_evaluation_metrics()
-        results = {}
-        
-        # Calculate training metrics
-        for metric_name, metric_func in metrics.items():
-            train_score = metric_func(y_train, train_pred)
-            val_score = metric_func(y_val, val_pred)
-            
-            results[f'train_{metric_name}'] = train_score
-            results[f'val_{metric_name}'] = val_score
-            results[f'{metric_name}_diff'] = abs(train_score - val_score)
-        
-        # Calculate overfitting indicator
-        primary_metric = list(metrics.keys())[0]
-        overfitting_score = results[f'{primary_metric}_diff'] / max(results[f'val_{primary_metric}'], 1e-8)
-        results['overfitting_indicator'] = overfitting_score
-        
-        return results
-    
-    def generate_evaluation_report(self, results: Dict[str, float]) -> str:
-        """Generate a comprehensive evaluation report"""
-        
-        report = f"""
-=== Model Evaluation Report ===
-
-Competition Type: {self.competition_type}
-Target Type: {self.target_type}
-CV Strategy: {self.cv_strategy}
-
-Performance Metrics:
-"""
-        
-        for metric, value in results.items():
-            if not metric.endswith('_diff') and metric != 'overfitting_indicator':
-                report += f"  {metric}: {value:.4f}\\n"
-        
-        report += f"""
-Model Analysis:
-  Overfitting Indicator: {results.get('overfitting_indicator', 0):.4f}
-  {'⚠️  High overfitting detected' if results.get('overfitting_indicator', 0) > 0.1 else '✅ Good generalization'}
-
-Recommendations:
-"""
-        
-        if results.get('overfitting_indicator', 0) > 0.1:
-            report += "  - Consider regularization techniques\\n"
-            report += "  - Reduce model complexity\\n"
-            report += "  - Increase training data if possible\\n"
-        else:
-            report += "  - Model shows good generalization\\n"
-            report += "  - Consider ensemble methods for further improvement\\n"
-        
-        return report
 
 # Global evaluator instance
 intelligent_evaluator = IntelligentEvaluator()
 `;
-  }
-
-  private generateIntelligentNotebook(intelligence: CompetitionIntelligence, generatedCode: any): string {
-    return `{
- "cells": [
-  {
-   "cell_type": "markdown",
-   "metadata": {},
-   "source": [
-    "# AI-Generated Competition Analysis\\n",
-    "\\n",
-    "**Competition Type:** ${intelligence.competitionType}\\n",
-    "**Estimated Difficulty:** ${intelligence.estimatedDifficulty}\\n",
-    "**Expected Score:** ${generatedCode.estimatedScore}\\n",
-    "\\n",
-    "This notebook was intelligently generated based on:\\n",
-    "- Analysis of ${intelligence.winningApproaches.length} winning approaches\\n",
-    "- Latest ML best practices from 2025\\n",
-    "- Competition-specific optimizations\\n",
-    "\\n",
-    "## Key Insights\\n",
-    "\\n",
-    "${intelligence.currentTrends.map(trend => `- ${trend}`).join('\\n')}"
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "metadata": {},
-   "source": [
-    "# Import AI-optimized libraries\\n",
-    "import pandas as pd\\n",
-    "import numpy as np\\n",
-    "import matplotlib.pyplot as plt\\n",
-    "import seaborn as sns\\n",
-    "\\n",
-    "# Import intelligent modules\\n",
-    "from src.intelligent_preprocessing import intelligent_preprocessor\\n",
-    "from src.recommended_models import model_engine\\n",
-    "from src.evaluation_strategies import intelligent_evaluator\\n",
-    "from config.intelligent_config import config\\n",
-    "\\n",
-    "# Set up logging\\n",
-    "import logging\\n",
-    "logging.basicConfig(level=logging.INFO)\\n",
-    "logger = logging.getLogger(__name__)\\n",
-    "\\n",
-    "print('🤖 AI-Powered Kaggle Solution Initialized')\\n",
-    "print(f'Competition Type: {config.competition_type}')\\n",
-    "print(f'Target Type: {config.target_type}')\\n",
-    "print(f'Recommended Models: {config.recommended_models}')"
-   ]
-  }
- ],
- "metadata": {
-  "kernelspec": {
-   "display_name": "Python 3",
-   "language": "python",
-   "name": "python3"
-  }
- },
- "nbformat": 4,
- "nbformat_minor": 4
-}`;
   }
 
   private getCVStrategy(intelligence: CompetitionIntelligence): string {
@@ -880,39 +682,5 @@ intelligent_evaluator = IntelligentEvaluator()
     } else {
       return 'simple';
     }
-  }
-
-  private estimateRuntime(intelligence: CompetitionIntelligence): string {
-    const complexity = intelligence.estimatedDifficulty;
-    const runtimeMap = {
-      'beginner': '5-10 minutes',
-      'intermediate': '15-30 minutes',
-      'advanced': '30-60 minutes',
-      'expert': '1-2 hours'
-    };
-    return runtimeMap[complexity] || '15-30 minutes';
-  }
-
-  private estimateMemoryUsage(intelligence: CompetitionIntelligence): string {
-    const size = intelligence.datasetCharacteristics.size;
-    const memoryMap = {
-      'small': '< 1GB',
-      'medium': '1-4GB',
-      'large': '4-8GB',
-      'very-large': '> 8GB'
-    };
-    return memoryMap[size] || '1-4GB';
-  }
-
-  private extractTechniques(intelligence: CompetitionIntelligence, generatedCode: any): string[] {
-    const techniques = [
-      ...intelligence.currentTrends,
-      ...intelligence.recommendedBaselines,
-      'Feature Engineering',
-      'Cross Validation',
-      'Hyperparameter Optimization'
-    ];
-    
-    return [...new Set(techniques)]; // Remove duplicates
   }
 }

@@ -16,8 +16,14 @@ import {
   Clock, 
   CheckCircle,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Play,
+  Pause,
+  Square
 } from 'lucide-react';
+import { supabase } from '@/lib/supabase-client';
+import { WorkflowState, WorkflowFactory } from '@/lib/project-workflow';
+import { ClientStorage, ProjectData } from '@/lib/client-storage';
 
 interface AIAgentStatus {
   isActive: boolean;
@@ -25,6 +31,7 @@ interface AIAgentStatus {
   knowledgeBaseSize: number;
   learningProgress: number;
   currentTask: string;
+  activeProjects: number;
   recentUpdates: Array<{
     type: string;
     description: string;
@@ -39,35 +46,13 @@ export function AIAgentDashboard() {
     lastUpdate: new Date(),
     knowledgeBaseSize: 15420,
     learningProgress: 78,
-    currentTask: 'Analyzing latest computer vision techniques',
-    recentUpdates: [
-      {
-        type: 'Research Papers',
-        description: 'Scanned 45 new arXiv papers on transformer architectures',
-        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-        status: 'completed'
-      },
-      {
-        type: 'Competition Analysis',
-        description: 'Analyzed winning solutions from 3 recent tabular competitions',
-        timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000),
-        status: 'completed'
-      },
-      {
-        type: 'Best Practices',
-        description: 'Updated feature engineering recommendations',
-        timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000),
-        status: 'completed'
-      },
-      {
-        type: 'Framework Updates',
-        description: 'Monitoring new releases of XGBoost and LightGBM',
-        timestamp: new Date(Date.now() - 30 * 60 * 1000),
-        status: 'in-progress'
-      }
-    ]
+    currentTask: 'Monitoring active workflows',
+    activeProjects: 0,
+    recentUpdates: []
   });
 
+  const [activeProjects, setActiveProjects] = useState<ProjectData[]>([]);
+  const [recentProjects, setRecentProjects] = useState<ProjectData[]>([]);
   const [knowledgeDomains] = useState([
     { name: 'Tabular Data', coverage: 92, sources: 3420 },
     { name: 'Computer Vision', coverage: 88, sources: 4150 },
@@ -75,6 +60,125 @@ export function AIAgentDashboard() {
     { name: 'Time Series', coverage: 79, sources: 2180 },
     { name: 'Multi-Modal', coverage: 71, sources: 1780 }
   ]);
+
+  useEffect(() => {
+    loadProjectData();
+    const interval = setInterval(loadProjectData, 5000); // Update every 5 seconds
+    return () => clearInterval(interval);
+  }, []);
+
+  const loadProjectData = async () => {
+    try {
+      // Load from client storage
+      const allProjects = ClientStorage.getAllProjects();
+      const runningProjects = ClientStorage.getRunningProjects();
+      const recent = ClientStorage.getRecentProjects(10);
+
+      setActiveProjects(runningProjects);
+      setRecentProjects(recent);
+
+      // Update agent status
+      setAgentStatus(prev => ({
+        ...prev,
+        activeProjects: runningProjects.length,
+        lastUpdate: new Date(),
+        currentTask: runningProjects.length > 0 
+          ? `Processing ${runningProjects.length} active project${runningProjects.length > 1 ? 's' : ''}`
+          : 'Monitoring for new projects',
+        recentUpdates: generateRecentUpdates(allProjects)
+      }));
+
+      // Also try to sync with Supabase
+      await syncWithSupabase();
+    } catch (error) {
+      console.error('Failed to load project data:', error);
+    }
+  };
+
+  const syncWithSupabase = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .order('updated_at', { ascending: false })
+        .limit(20);
+
+      if (error) {
+        console.warn('Failed to sync with Supabase:', error);
+        return;
+      }
+
+      if (data) {
+        // Update client storage with latest data from Supabase
+        data.forEach(project => {
+          const projectData: ProjectData = {
+            id: project.id,
+            competitionName: project.competition_name,
+            status: project.status as WorkflowState,
+            progress: project.progress,
+            currentStep: project.current_step,
+            options: project.options,
+            files: project.files,
+            error: project.error_message || undefined,
+            createdAt: project.created_at,
+            estimatedCompletion: project.estimated_completion || undefined
+          };
+          
+          ClientStorage.saveProject(projectData);
+        });
+      }
+    } catch (error) {
+      console.warn('Supabase sync failed:', error);
+    }
+  };
+
+  const generateRecentUpdates = (projects: ProjectData[]) => {
+    const updates = [];
+    
+    // Add project-based updates
+    projects.slice(0, 5).forEach(project => {
+      let status: 'completed' | 'in-progress' | 'failed' = 'in-progress';
+      let description = '';
+      
+      if (project.status === WorkflowState.COMPLETED) {
+        status = 'completed';
+        description = `Generated project for ${project.competitionName}`;
+      } else if (project.status === WorkflowState.FAILED) {
+        status = 'failed';
+        description = `Failed to generate project for ${project.competitionName}`;
+      } else if (project.status !== WorkflowState.QUEUED) {
+        status = 'in-progress';
+        description = `Processing ${project.competitionName}: ${project.currentStep}`;
+      }
+      
+      if (description) {
+        updates.push({
+          type: 'Project Generation',
+          description,
+          timestamp: new Date(project.createdAt),
+          status
+        });
+      }
+    });
+
+    // Add some mock knowledge updates
+    updates.push(
+      {
+        type: 'Research Papers',
+        description: 'Scanned 45 new arXiv papers on transformer architectures',
+        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
+        status: 'completed' as const
+      },
+      {
+        type: 'Competition Analysis',
+        description: 'Analyzed winning solutions from 3 recent tabular competitions',
+        timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000),
+        status: 'completed' as const
+      }
+    );
+
+    return updates.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).slice(0, 10);
+  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -89,6 +193,19 @@ export function AIAgentDashboard() {
     }
   };
 
+  const getWorkflowStatusColor = (status: WorkflowState) => {
+    switch (status) {
+      case WorkflowState.COMPLETED:
+        return 'bg-green-500';
+      case WorkflowState.FAILED:
+        return 'bg-red-500';
+      case WorkflowState.CANCELLED:
+        return 'bg-gray-500';
+      default:
+        return 'bg-blue-500';
+    }
+  };
+
   const formatTimeAgo = (date: Date) => {
     const now = new Date();
     const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
@@ -99,6 +216,31 @@ export function AIAgentDashboard() {
       return `${Math.floor(diffInMinutes / 60)}h ago`;
     } else {
       return `${Math.floor(diffInMinutes / 1440)}d ago`;
+    }
+  };
+
+  const handleCancelProject = async (projectId: string) => {
+    try {
+      const workflow = WorkflowFactory.getWorkflow(projectId);
+      if (workflow) {
+        await workflow.cancel();
+        WorkflowFactory.removeWorkflow(projectId);
+      }
+      
+      // Update in Supabase
+      await supabase
+        .from('projects')
+        .update({ 
+          status: WorkflowState.CANCELLED,
+          current_step: 'Project cancelled by user',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', projectId);
+      
+      // Reload data
+      await loadProjectData();
+    } catch (error) {
+      console.error('Failed to cancel project:', error);
     }
   };
 
@@ -126,6 +268,19 @@ export function AIAgentDashboard() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Projects</CardTitle>
+            <Zap className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{agentStatus.activeProjects}</div>
+            <p className="text-xs text-muted-foreground">
+              Currently processing
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Knowledge Base</CardTitle>
             <BookOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -147,24 +302,74 @@ export function AIAgentDashboard() {
             <Progress value={agentStatus.learningProgress} className="mt-2" />
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Current Task</CardTitle>
-            <Zap className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm">{agentStatus.currentTask}</p>
-          </CardContent>
-        </Card>
       </div>
 
-      <Tabs defaultValue="activity" className="space-y-4">
+      <Tabs defaultValue="workflows" className="space-y-4">
         <TabsList>
+          <TabsTrigger value="workflows">Active Workflows</TabsTrigger>
           <TabsTrigger value="activity">Recent Activity</TabsTrigger>
           <TabsTrigger value="knowledge">Knowledge Domains</TabsTrigger>
           <TabsTrigger value="settings">Agent Settings</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="workflows" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Active Project Workflows</CardTitle>
+              <CardDescription>
+                Real-time monitoring of project generation workflows
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {activeProjects.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Zap className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No active workflows</p>
+                  <p className="text-sm">Start a new project to see workflows here</p>
+                </div>
+              ) : (
+                <ScrollArea className="h-[400px]">
+                  <div className="space-y-4">
+                    {activeProjects.map((project) => (
+                      <div key={project.id} className="flex items-start space-x-3 p-4 rounded-lg border">
+                        <div className={`h-3 w-3 rounded-full mt-1 ${getWorkflowStatusColor(project.status)}`} />
+                        <div className="flex-1 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-medium">{project.competitionName}</h4>
+                            <div className="flex items-center space-x-2">
+                              <Badge variant="outline">{project.status}</Badge>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleCancelProject(project.id)}
+                                disabled={project.status === WorkflowState.COMPLETED || project.status === WorkflowState.FAILED}
+                              >
+                                <Square className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                          <p className="text-sm text-muted-foreground">{project.currentStep}</p>
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-xs">
+                              <span>Progress</span>
+                              <span>{project.progress}%</span>
+                            </div>
+                            <Progress value={project.progress} className="h-2" />
+                          </div>
+                          {project.estimatedCompletion && (
+                            <p className="text-xs text-muted-foreground">
+                              ETA: {new Date(project.estimatedCompletion).toLocaleTimeString()}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="activity" className="space-y-4">
           <Card>

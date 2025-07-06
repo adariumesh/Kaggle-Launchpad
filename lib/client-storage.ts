@@ -1,8 +1,10 @@
 // Client-side storage utilities for project data
+import { WorkflowState } from './project-workflow';
+
 export interface ProjectData {
   id: string;
   competitionName: string;
-  status: 'idle' | 'generating' | 'completed' | 'error';
+  status: WorkflowState;
   progress: number;
   currentStep: string;
   options: {
@@ -28,6 +30,12 @@ export interface ProjectData {
     generateDocumentation: boolean;
     includeUnitTests: boolean;
     codeOptimization: 'none' | 'basic' | 'advanced';
+    // Workflow-specific options
+    competitionUrl?: string;
+    useLatestPractices?: boolean;
+    adaptToCompetitionType?: boolean;
+    includeWinningTechniques?: boolean;
+    optimizeForLeaderboard?: boolean;
   };
   files?: GeneratedFile[];
   notebook?: KaggleNotebook;
@@ -114,5 +122,23 @@ export class ClientStorage {
     } catch (error) {
       console.error('Failed to clear projects:', error);
     }
+  }
+
+  static getProjectsByStatus(status: WorkflowState): ProjectData[] {
+    return this.getAllProjects().filter(p => p.status === status);
+  }
+
+  static getRunningProjects(): ProjectData[] {
+    const runningStates = [
+      WorkflowState.QUEUED,
+      WorkflowState.INITIALIZING,
+      WorkflowState.ANALYZING_COMPETITION,
+      WorkflowState.GATHERING_PRACTICES,
+      WorkflowState.GENERATING_CODE,
+      WorkflowState.CREATING_STRUCTURE,
+      WorkflowState.FINALIZING
+    ];
+    
+    return this.getAllProjects().filter(p => runningStates.includes(p.status));
   }
 }
