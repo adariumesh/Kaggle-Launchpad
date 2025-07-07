@@ -275,26 +275,26 @@ export default function KaggleNotebookGenerator() {
                 Kaggle Launchpad
               </h1>
             </div>
-            <p className="text-xl text-gray-300 max-w-2xl mx-auto">
+            <p className="text-xl text-gray-200 max-w-2xl mx-auto">
               Generate production-ready Kaggle competition notebooks with AI-powered analysis, 
               feature engineering, and winning techniques.
             </p>
           </div>
 
           {/* Landing Section - URL Input */}
-          <Card className="glass-card border-white/10 mb-8">
+          <Card className="glass-card border-white/20 mb-8 bg-white/10 backdrop-blur-xl">
             <CardHeader className="text-center">
               <CardTitle className="text-2xl text-white flex items-center justify-center">
                 <Globe className="h-6 w-6 mr-2 text-blue-400" />
                 Enter Competition URL
               </CardTitle>
-              <CardDescription className="text-gray-300">
+              <CardDescription className="text-gray-200">
                 Paste the URL of any Kaggle competition to get started
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="kaggle-url" className="text-white">
+                <Label htmlFor="kaggle-url" className="text-white font-medium">
                   Kaggle Competition URL
                 </Label>
                 <Input
@@ -303,17 +303,17 @@ export default function KaggleNotebookGenerator() {
                   placeholder="https://www.kaggle.com/c/competition-name"
                   value={kaggleUrl}
                   onChange={(e) => setKaggleUrl(e.target.value)}
-                  className="bg-white/10 border-white/20 text-white placeholder:text-gray-400"
+                  className="bg-white/20 border-white/30 text-white placeholder:text-gray-300 focus:border-purple-400 focus:ring-purple-400"
                   disabled={isGenerating}
                 />
-                <p className="text-sm text-gray-400">
+                <p className="text-sm text-gray-300">
                   Example: https://www.kaggle.com/c/titanic
                 </p>
               </div>
               
               <Button 
                 onClick={handleUrlSubmit}
-                className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white"
+                className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-medium"
                 disabled={isGenerating || !kaggleUrl.trim()}
               >
                 <ArrowRight className="h-4 w-4 mr-2" />
@@ -325,21 +325,21 @@ export default function KaggleNotebookGenerator() {
           {/* Options Section */}
           {showOptionsSection && (
             <div ref={optionsSectionRef} className="space-y-6">
-              <Card className="glass-card border-white/10">
+              <Card className="glass-card border-white/20 bg-white/10 backdrop-blur-xl">
                 <CardHeader>
                   <CardTitle className="text-2xl text-white flex items-center">
                     <Zap className="h-6 w-6 mr-2 text-yellow-400" />
                     Generation Options
                   </CardTitle>
-                  <CardDescription className="text-gray-300">
+                  <CardDescription className="text-gray-200">
                     Configure your notebook generation preferences
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   {/* Basic Options */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="include-eda" className="text-white">
+                    <div className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10">
+                      <Label htmlFor="include-eda" className="text-white font-medium">
                         Include EDA (Exploratory Data Analysis)
                       </Label>
                       <Switch
@@ -350,8 +350,8 @@ export default function KaggleNotebookGenerator() {
                       />
                     </div>
                     
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="include-baseline" className="text-white">
+                    <div className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10">
+                      <Label htmlFor="include-baseline" className="text-white font-medium">
                         Include Baseline Model
                       </Label>
                       <Switch
@@ -368,7 +368,7 @@ export default function KaggleNotebookGenerator() {
                     <CollapsibleTrigger asChild>
                       <Button 
                         variant="outline" 
-                        className="w-full border-white/20 text-gray-300 hover:bg-white/10"
+                        className="w-full border-white/30 text-white hover:bg-white/10 bg-white/5 font-medium"
                         disabled={isGenerating}
                       >
                         {showAdvancedOptions ? (
@@ -382,25 +382,25 @@ export default function KaggleNotebookGenerator() {
                     <CollapsibleContent className="space-y-4 mt-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label htmlFor="model-select" className="text-white">
+                          <Label htmlFor="model-select" className="text-white font-medium">
                             Primary Model
                           </Label>
                           <Select value={selectedModel} onValueChange={setSelectedModel} disabled={isGenerating}>
-                            <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                            <SelectTrigger className="bg-white/20 border-white/30 text-white">
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="random-forest">Random Forest</SelectItem>
-                              <SelectItem value="xgboost">XGBoost</SelectItem>
-                              <SelectItem value="lightgbm">LightGBM</SelectItem>
-                              <SelectItem value="catboost">CatBoost</SelectItem>
-                              <SelectItem value="neural-network">Neural Network</SelectItem>
+                            <SelectContent className="bg-gray-800 border-white/20">
+                              <SelectItem value="random-forest" className="text-white hover:bg-white/10">Random Forest</SelectItem>
+                              <SelectItem value="xgboost" className="text-white hover:bg-white/10">XGBoost</SelectItem>
+                              <SelectItem value="lightgbm" className="text-white hover:bg-white/10">LightGBM</SelectItem>
+                              <SelectItem value="catboost" className="text-white hover:bg-white/10">CatBoost</SelectItem>
+                              <SelectItem value="neural-network" className="text-white hover:bg-white/10">Neural Network</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
 
                         <div className="space-y-2">
-                          <Label htmlFor="cv-folds" className="text-white">
+                          <Label htmlFor="cv-folds" className="text-white font-medium">
                             Cross-Validation Folds
                           </Label>
                           <Select 
@@ -408,21 +408,21 @@ export default function KaggleNotebookGenerator() {
                             onValueChange={(value) => setCrossValidationFolds(parseInt(value))}
                             disabled={isGenerating}
                           >
-                            <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                            <SelectTrigger className="bg-white/20 border-white/30 text-white">
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="3">3 Folds</SelectItem>
-                              <SelectItem value="5">5 Folds</SelectItem>
-                              <SelectItem value="10">10 Folds</SelectItem>
+                            <SelectContent className="bg-gray-800 border-white/20">
+                              <SelectItem value="3" className="text-white hover:bg-white/10">3 Folds</SelectItem>
+                              <SelectItem value="5" className="text-white hover:bg-white/10">5 Folds</SelectItem>
+                              <SelectItem value="10" className="text-white hover:bg-white/10">10 Folds</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor="hyperparameter-tuning" className="text-white">
+                        <div className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10">
+                          <Label htmlFor="hyperparameter-tuning" className="text-white font-medium">
                             Hyperparameter Tuning
                           </Label>
                           <Switch
@@ -433,8 +433,8 @@ export default function KaggleNotebookGenerator() {
                           />
                         </div>
 
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor="feature-engineering" className="text-white">
+                        <div className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10">
+                          <Label htmlFor="feature-engineering" className="text-white font-medium">
                             Advanced Feature Engineering
                           </Label>
                           <Switch
@@ -448,24 +448,24 @@ export default function KaggleNotebookGenerator() {
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label htmlFor="ensemble-method" className="text-white">
+                          <Label htmlFor="ensemble-method" className="text-white font-medium">
                             Ensemble Method
                           </Label>
                           <Select value={ensembleMethod} onValueChange={setEnsembleMethod} disabled={isGenerating}>
-                            <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                            <SelectTrigger className="bg-white/20 border-white/30 text-white">
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">None</SelectItem>
-                              <SelectItem value="voting">Voting</SelectItem>
-                              <SelectItem value="stacking">Stacking</SelectItem>
-                              <SelectItem value="blending">Blending</SelectItem>
+                            <SelectContent className="bg-gray-800 border-white/20">
+                              <SelectItem value="none" className="text-white hover:bg-white/10">None</SelectItem>
+                              <SelectItem value="voting" className="text-white hover:bg-white/10">Voting</SelectItem>
+                              <SelectItem value="stacking" className="text-white hover:bg-white/10">Stacking</SelectItem>
+                              <SelectItem value="blending" className="text-white hover:bg-white/10">Blending</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
 
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor="explainability" className="text-white">
+                        <div className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10">
+                          <Label htmlFor="explainability" className="text-white font-medium">
                             Include Model Explainability
                           </Label>
                           <Switch
@@ -481,7 +481,7 @@ export default function KaggleNotebookGenerator() {
 
                   {/* Email Input */}
                   <div className="space-y-2">
-                    <Label htmlFor="email" className="text-white flex items-center">
+                    <Label htmlFor="email" className="text-white flex items-center font-medium">
                       <Mail className="h-4 w-4 mr-2 text-blue-400" />
                       Email Address
                     </Label>
@@ -491,10 +491,10 @@ export default function KaggleNotebookGenerator() {
                       placeholder="your.email@example.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="bg-white/10 border-white/20 text-white placeholder:text-gray-400"
+                      className="bg-white/20 border-white/30 text-white placeholder:text-gray-300 focus:border-purple-400 focus:ring-purple-400"
                       disabled={isGenerating}
                     />
-                    <p className="text-sm text-gray-400">
+                    <p className="text-sm text-gray-300">
                       You'll receive a notification when your notebook is ready
                     </p>
                   </div>
@@ -503,7 +503,7 @@ export default function KaggleNotebookGenerator() {
                   <div className="flex flex-col sm:flex-row gap-3">
                     <Button 
                       onClick={handleGenerate}
-                      className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
+                      className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-medium"
                       disabled={isGenerating || !email.trim()}
                     >
                       {isGenerating ? (
@@ -522,7 +522,7 @@ export default function KaggleNotebookGenerator() {
                     <Button 
                       onClick={handleRetry}
                       variant="outline"
-                      className="border-white/20 text-gray-300 hover:bg-white/10"
+                      className="border-white/30 text-white hover:bg-white/10 bg-white/5 font-medium"
                       disabled={isGenerating}
                     >
                       <RotateCcw className="h-4 w-4 mr-2" />
@@ -533,7 +533,7 @@ export default function KaggleNotebookGenerator() {
                       <Button 
                         onClick={handleCancel}
                         variant="outline"
-                        className="border-red-500/50 text-red-400 hover:bg-red-500/10"
+                        className="border-red-500/50 text-red-400 hover:bg-red-500/10 bg-red-500/5"
                       >
                         <X className="h-4 w-4 mr-2" />
                         Cancel
@@ -545,7 +545,7 @@ export default function KaggleNotebookGenerator() {
 
               {/* Progress Section */}
               {(isGenerating || currentProject?.status === WorkflowState.COMPLETED) && (
-                <Card className="glass-card border-white/10">
+                <Card className="glass-card border-white/20 bg-white/10 backdrop-blur-xl">
                   <CardHeader>
                     <CardTitle className="text-xl text-white flex items-center">
                       {currentProject?.status === WorkflowState.COMPLETED ? (
@@ -561,7 +561,7 @@ export default function KaggleNotebookGenerator() {
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-300">{currentStep}</span>
+                        <span className="text-gray-200">{currentStep}</span>
                         <span className="text-white font-medium">{progress}%</span>
                       </div>
                       <Progress value={progress} className="h-3" />
@@ -571,7 +571,7 @@ export default function KaggleNotebookGenerator() {
                       <div className="flex flex-col sm:flex-row gap-3">
                         <Button 
                           onClick={handleDownloadNotebook}
-                          className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
+                          className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium"
                         >
                           <Download className="h-4 w-4 mr-2" />
                           Download Notebook
@@ -579,7 +579,7 @@ export default function KaggleNotebookGenerator() {
                         <Button 
                           onClick={handleDownloadProject}
                           variant="outline"
-                          className="flex-1 border-white/20 text-gray-300 hover:bg-white/10"
+                          className="flex-1 border-white/30 text-white hover:bg-white/10 bg-white/5 font-medium"
                         >
                           <Download className="h-4 w-4 mr-2" />
                           Download All Files
@@ -594,7 +594,7 @@ export default function KaggleNotebookGenerator() {
                         </p>
                         <Button 
                           onClick={handleRetry}
-                          className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white"
+                          className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-medium"
                         >
                           <RotateCcw className="h-4 w-4 mr-2" />
                           Try Again

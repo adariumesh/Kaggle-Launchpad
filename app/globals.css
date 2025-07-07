@@ -85,7 +85,7 @@
 
 @layer components {
   .glass-card {
-    @apply bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl;
+    @apply bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl;
   }
   
   .gradient-border {
@@ -135,6 +135,32 @@
     width: 350px;
     height: 600px;
     animation: float-gentle 18s ease-in-out infinite;
+  }
+
+  /* Enhanced input and select styling for dark theme */
+  .dark input[type="text"],
+  .dark input[type="email"],
+  .dark input[type="url"] {
+    @apply text-white placeholder:text-gray-300;
+  }
+
+  /* Enhanced select dropdown styling */
+  .dark [data-radix-select-content] {
+    @apply bg-gray-800 border-white/20;
+  }
+
+  .dark [data-radix-select-item] {
+    @apply text-white hover:bg-white/10 focus:bg-white/10;
+  }
+
+  /* Enhanced switch styling */
+  .dark [data-radix-switch-root] {
+    @apply bg-gray-600 data-[state=checked]:bg-purple-600;
+  }
+
+  /* Enhanced button styling */
+  .dark button[data-radix-collapsible-trigger] {
+    @apply text-white border-white/30 hover:bg-white/10;
   }
 }
 
@@ -252,10 +278,29 @@
 
 /* Enhanced glassmorphism effects */
 .glass-card:hover {
-  @apply bg-white/10 border-white/20 transition-all duration-300;
+  @apply bg-white/15 border-white/30 transition-all duration-300;
 }
 
 /* Progress bar styling for dark theme */
 .progress-bar {
   background: linear-gradient(90deg, #8b5cf6, #06b6d4);
+}
+
+/* Enhanced text contrast for better visibility */
+.text-enhanced {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* Better contrast for form elements */
+input:focus,
+select:focus,
+textarea:focus {
+  @apply ring-2 ring-purple-400 border-purple-400;
+}
+
+/* Enhanced card backgrounds for better text visibility */
+.enhanced-card {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
 }
