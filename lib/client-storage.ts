@@ -1,5 +1,18 @@
 // Client-side storage utilities for project data
-import { WorkflowState } from './project-workflow';
+// Now serves as a cache for data received from the backend API
+
+export enum WorkflowState {
+  QUEUED = 'queued',
+  INITIALIZING = 'initializing',
+  ANALYZING_COMPETITION = 'analyzing_competition',
+  GATHERING_PRACTICES = 'gathering_practices',
+  GENERATING_CODE = 'generating_code',
+  CREATING_STRUCTURE = 'creating_structure',
+  FINALIZING = 'finalizing',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+  CANCELLED = 'cancelled'
+}
 
 export interface ProjectData {
   id: string;
@@ -140,5 +153,15 @@ export class ClientStorage {
     ];
     
     return this.getAllProjects().filter(p => runningStates.includes(p.status));
+  }
+
+  // Cache management for backend API responses
+  static cacheProjects(projects: ProjectData[]): void {
+    try {
+      // Update local storage with fresh data from backend
+      projects.forEach(project => this.saveProject(project));
+    } catch (error) {
+      console.error('Failed to cache projects:', error);
+    }
   }
 }

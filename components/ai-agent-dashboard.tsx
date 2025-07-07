@@ -19,31 +19,17 @@ import {
   RefreshCw,
   Play,
   Pause,
-  Square
+  Square,
+  Download
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase-client';
-import { WorkflowState, WorkflowFactory } from '@/lib/project-workflow';
-import { ClientStorage, ProjectData } from '@/lib/client-storage';
-
-interface AIAgentStatus {
-  isActive: boolean;
-  lastUpdate: Date;
-  knowledgeBaseSize: number;
-  learningProgress: number;
-  currentTask: string;
-  activeProjects: number;
-  recentUpdates: Array<{
-    type: string;
-    description: string;
-    timestamp: Date;
-    status: 'completed' | 'in-progress' | 'failed';
-  }>;
-}
+import { WorkflowState, ProjectData, ClientStorage } from '@/lib/client-storage';
+import { apiClient, AgentStatus } from '@/lib/api-client';
+import { toast } from 'sonner';
 
 export function AIAgentDashboard() {
-  const [agentStatus, setAgentStatus] = useState<AIAgentStatus>({
+  const [agentStatus, setAgentStatus] = useState<AgentStatus>({
     isActive: true,
-    lastUpdate: new Date(),
+    lastUpdate: new Date().toISOString(),
     knowledgeBaseSize: 15420,
     learningProgress: 78,
     currentTask: 'Monitoring active workflows',
@@ -53,13 +39,14 @@ export function AIAgentDashboard() {
 
   const [activeProjects, setActiveProjects] = useState<ProjectData[]>([]);
   const [recentProjects, setRecentProjects] = useState<ProjectData[]>([]);
-  const [knowledgeDomains] = useState([
+  const [knowledgeDomains, setKnowledgeDomains] = useState([
     { name: 'Tabular Data', coverage: 92, sources: 3420 },
     { name: 'Computer Vision', coverage: 88, sources: 4150 },
     { name: 'Natural Language Processing', coverage: 85, sources: 3890 },
     { name: 'Time Series', coverage: 79, sources: 2180 },
     { name: 'Multi-Modal', coverage: 71, sources: 1780 }
   ]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     loadProjectData();
@@ -69,115 +56,56 @@ export function AIAgentDashboard() {
 
   const loadProjectData = async () => {
     try {
-      // Load from client storage
-      const allProjects = ClientStorage.getAllProjects();
-      const runningProjects = ClientStorage.getRunningProjects();
-      const recent = ClientStorage.getRecentProjects(10);
+      setIsLoading(true);
+      
+      // Load data from backend API
+      const [allProjects, agentStatusData, knowledgeDomainsData] = await Promise.all([
+        apiClient.getAllProjects().catch(() => []),
+        apiClient.getAgentStatus().catch(() => agentStatus),
+        apiClient.getKnowledgeDomains().catch(() => knowledgeDomains)
+      ]);
+
+      // Cache projects locally for offline access
+      ClientStorage.cacheProjects(allProjects);
+
+      // Filter active and recent projects
+      const runningProjects = allProjects.filter(project => {
+        const runningStates = [
+          WorkflowState.QUEUED,
+          WorkflowState.INITIALIZING,
+          WorkflowState.ANALYZING_COMPETITION,
+          WorkflowState.GATHERING_PRACTICES,
+          WorkflowState.GENERATING_CODE,
+          WorkflowState.CREATING_STRUCTURE,
+          WorkflowState.FINALIZING
+        ];
+        return runningStates.includes(project.status);
+      });
+
+      const recent = allProjects
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 10);
 
       setActiveProjects(runningProjects);
       setRecentProjects(recent);
+      setAgentStatus(agentStatusData);
+      setKnowledgeDomains(knowledgeDomainsData);
 
-      // Update agent status
-      setAgentStatus(prev => ({
-        ...prev,
-        activeProjects: runningProjects.length,
-        lastUpdate: new Date(),
-        currentTask: runningProjects.length > 0 
-          ? `Processing ${runningProjects.length} active project${runningProjects.length > 1 ? 's' : ''}`
-          : 'Monitoring for new projects',
-        recentUpdates: generateRecentUpdates(allProjects)
-      }));
-
-      // Also try to sync with Supabase
-      await syncWithSupabase();
     } catch (error) {
       console.error('Failed to load project data:', error);
-    }
-  };
-
-  const syncWithSupabase = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('projects')
-        .select('*')
-        .order('updated_at', { ascending: false })
-        .limit(20);
-
-      if (error) {
-        console.warn('Failed to sync with Supabase:', error);
-        return;
-      }
-
-      if (data) {
-        // Update client storage with latest data from Supabase
-        data.forEach(project => {
-          const projectData: ProjectData = {
-            id: project.id,
-            competitionName: project.competition_name,
-            status: project.status as WorkflowState,
-            progress: project.progress,
-            currentStep: project.current_step,
-            options: project.options,
-            files: project.files,
-            error: project.error_message || undefined,
-            createdAt: project.created_at,
-            estimatedCompletion: project.estimated_completion || undefined
-          };
-          
-          ClientStorage.saveProject(projectData);
-        });
-      }
-    } catch (error) {
-      console.warn('Supabase sync failed:', error);
-    }
-  };
-
-  const generateRecentUpdates = (projects: ProjectData[]) => {
-    const updates = [];
-    
-    // Add project-based updates
-    projects.slice(0, 5).forEach(project => {
-      let status: 'completed' | 'in-progress' | 'failed' = 'in-progress';
-      let description = '';
       
-      if (project.status === WorkflowState.COMPLETED) {
-        status = 'completed';
-        description = `Generated project for ${project.competitionName}`;
-      } else if (project.status === WorkflowState.FAILED) {
-        status = 'failed';
-        description = `Failed to generate project for ${project.competitionName}`;
-      } else if (project.status !== WorkflowState.QUEUED) {
-        status = 'in-progress';
-        description = `Processing ${project.competitionName}: ${project.currentStep}`;
-      }
+      // Fallback to local storage if API is unavailable
+      const localProjects = ClientStorage.getAllProjects();
+      const localRunning = ClientStorage.getRunningProjects();
+      const localRecent = ClientStorage.getRecentProjects(10);
       
-      if (description) {
-        updates.push({
-          type: 'Project Generation',
-          description,
-          timestamp: new Date(project.createdAt),
-          status
-        });
-      }
-    });
-
-    // Add some mock knowledge updates
-    updates.push(
-      {
-        type: 'Research Papers',
-        description: 'Scanned 45 new arXiv papers on transformer architectures',
-        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-        status: 'completed' as const
-      },
-      {
-        type: 'Competition Analysis',
-        description: 'Analyzed winning solutions from 3 recent tabular competitions',
-        timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000),
-        status: 'completed' as const
-      }
-    );
-
-    return updates.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).slice(0, 10);
+      setActiveProjects(localRunning);
+      setRecentProjects(localRecent);
+      
+      toast.error('Failed to connect to backend. Showing cached data.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const getStatusIcon = (status: string) => {
@@ -206,7 +134,8 @@ export function AIAgentDashboard() {
     }
   };
 
-  const formatTimeAgo = (date: Date) => {
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
     const now = new Date();
     const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
     
@@ -221,28 +150,65 @@ export function AIAgentDashboard() {
 
   const handleCancelProject = async (projectId: string) => {
     try {
-      const workflow = WorkflowFactory.getWorkflow(projectId);
-      if (workflow) {
-        await workflow.cancel();
-        WorkflowFactory.removeWorkflow(projectId);
-      }
+      await apiClient.cancelProject(projectId);
+      toast.success('Project cancelled successfully');
       
-      // Update in Supabase
-      await supabase
-        .from('projects')
-        .update({ 
-          status: WorkflowState.CANCELLED,
-          current_step: 'Project cancelled by user',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', projectId);
-      
-      // Reload data
+      // Reload data to reflect changes
       await loadProjectData();
     } catch (error) {
       console.error('Failed to cancel project:', error);
+      toast.error('Failed to cancel project');
     }
   };
+
+  const handleDownloadProject = async (projectId: string) => {
+    try {
+      const blob = await apiClient.downloadProjectFiles(projectId);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `project-${projectId}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast.success('Project files downloaded successfully');
+    } catch (error) {
+      console.error('Failed to download project:', error);
+      toast.error('Failed to download project files');
+    }
+  };
+
+  const handleDownloadNotebook = async (projectId: string) => {
+    try {
+      const blob = await apiClient.downloadNotebook(projectId);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `notebook-${projectId}.ipynb`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast.success('Notebook downloaded successfully');
+    } catch (error) {
+      console.error('Failed to download notebook:', error);
+      toast.error('Failed to download notebook');
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <RefreshCw className="h-8 w-8 animate-spin text-blue-500" />
+        <span className="ml-2 text-lg">Loading dashboard...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -338,6 +304,26 @@ export function AIAgentDashboard() {
                             <h4 className="font-medium">{project.competitionName}</h4>
                             <div className="flex items-center space-x-2">
                               <Badge variant="outline">{project.status}</Badge>
+                              {project.status === WorkflowState.COMPLETED && (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleDownloadProject(project.id)}
+                                  >
+                                    <Download className="h-3 w-3 mr-1" />
+                                    Files
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleDownloadNotebook(project.id)}
+                                  >
+                                    <Download className="h-3 w-3 mr-1" />
+                                    Notebook
+                                  </Button>
+                                </>
+                              )}
                               <Button
                                 size="sm"
                                 variant="outline"
