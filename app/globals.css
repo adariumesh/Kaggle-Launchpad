@@ -85,7 +85,7 @@
 
 @layer components {
   .glass-card {
-    @apply bg-white/80 backdrop-blur-sm border border-white/20 shadow-xl;
+    @apply bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl;
   }
   
   .gradient-border {
@@ -106,27 +106,27 @@
   }
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar for dark theme */
 ::-webkit-scrollbar {
   width: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.05);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgb(203 213 225);
+  background: rgba(255, 255, 255, 0.2);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgb(148 163 184);
+  background: rgba(255, 255, 255, 0.3);
 }
 
 /* Smooth focus transitions */
 .focus-visible {
-  @apply outline-none ring-2 ring-indigo-500 ring-offset-2 transition-all duration-200;
+  @apply outline-none ring-2 ring-purple-500 ring-offset-2 ring-offset-gray-900 transition-all duration-200;
 }
 
 /* Loading animation */
@@ -141,4 +141,14 @@
 
 .animate-pulse-slow {
   animation: pulse-slow 2s ease-in-out infinite;
+}
+
+/* Enhanced glassmorphism effects */
+.glass-card:hover {
+  @apply bg-white/10 border-white/20 transition-all duration-300;
+}
+
+/* Progress bar styling for dark theme */
+.progress-bar {
+  background: linear-gradient(90deg, #8b5cf6, #06b6d4);
 }
