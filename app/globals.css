@@ -136,32 +136,6 @@
     height: 600px;
     animation: float-gentle 18s ease-in-out infinite;
   }
-
-  /* Enhanced input and select styling for dark theme */
-  .dark input[type="text"],
-  .dark input[type="email"],
-  .dark input[type="url"] {
-    @apply text-white placeholder:text-gray-300;
-  }
-
-  /* Enhanced select dropdown styling */
-  .dark [data-radix-select-content] {
-    @apply bg-gray-800 border-white/20;
-  }
-
-  .dark [data-radix-select-item] {
-    @apply text-white hover:bg-white/10 focus:bg-white/10;
-  }
-
-  /* Enhanced switch styling */
-  .dark [data-radix-switch-root] {
-    @apply bg-gray-600 data-[state=checked]:bg-purple-600;
-  }
-
-  /* Enhanced button styling */
-  .dark button[data-radix-collapsible-trigger] {
-    @apply text-white border-white/30 hover:bg-white/10;
-  }
 }
 
 @keyframes float {
@@ -286,6 +260,20 @@
   background: linear-gradient(90deg, #8b5cf6, #06b6d4);
 }
 
+/* Enhanced switch styling for better visibility */
+[data-radix-switch-root] {
+  background-color: rgb(75 85 99) !important; /* gray-600 */
+}
+
+[data-radix-switch-root][data-state="checked"] {
+  background-color: rgb(147 51 234) !important; /* purple-600 */
+}
+
+[data-radix-switch-thumb] {
+  background-color: white !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+}
+
 /* Enhanced text contrast for better visibility */
 .text-enhanced {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
@@ -303,4 +291,14 @@ textarea:focus {
   background: rgba(255, 255, 255, 0.15);
   backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+/* Ensure proper scrolling behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  overflow-x: hidden;
+  overflow-y: auto;
 }

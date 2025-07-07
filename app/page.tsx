@@ -256,7 +256,7 @@ export default function KaggleNotebookGenerator() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-slate-900 to-black relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-slate-900 to-black relative">
       {/* Organic flowing background shapes */}
       <div className="bg-shape bg-shape-1 -top-32 -left-32" />
       <div className="bg-shape bg-shape-2 top-1/4 -right-40" />
@@ -347,6 +347,7 @@ export default function KaggleNotebookGenerator() {
                         checked={includeEDA}
                         onCheckedChange={setIncludeEDA}
                         disabled={isGenerating}
+                        className="data-[state=checked]:bg-purple-600 data-[state=unchecked]:bg-gray-600"
                       />
                     </div>
                     
@@ -359,6 +360,7 @@ export default function KaggleNotebookGenerator() {
                         checked={includeBaseline}
                         onCheckedChange={setIncludeBaseline}
                         disabled={isGenerating}
+                        className="data-[state=checked]:bg-purple-600 data-[state=unchecked]:bg-gray-600"
                       />
                     </div>
                   </div>
@@ -430,6 +432,7 @@ export default function KaggleNotebookGenerator() {
                             checked={hyperparameterTuning}
                             onCheckedChange={setHyperparameterTuning}
                             disabled={isGenerating}
+                            className="data-[state=checked]:bg-purple-600 data-[state=unchecked]:bg-gray-600"
                           />
                         </div>
 
@@ -442,6 +445,7 @@ export default function KaggleNotebookGenerator() {
                             checked={includeAdvancedFeatureEngineering}
                             onCheckedChange={setIncludeAdvancedFeatureEngineering}
                             disabled={isGenerating}
+                            className="data-[state=checked]:bg-purple-600 data-[state=unchecked]:bg-gray-600"
                           />
                         </div>
                       </div>
@@ -473,6 +477,7 @@ export default function KaggleNotebookGenerator() {
                             checked={includeExplainability}
                             onCheckedChange={setIncludeExplainability}
                             disabled={isGenerating}
+                            className="data-[state=checked]:bg-purple-600 data-[state=unchecked]:bg-gray-600"
                           />
                         </div>
                       </div>
