@@ -37,21 +37,6 @@ export interface CreateProjectRequest {
   };
 }
 
-export interface AgentStatus {
-  isActive: boolean;
-  lastUpdate: string;
-  knowledgeBaseSize: number;
-  learningProgress: number;
-  currentTask: string;
-  activeProjects: number;
-  recentUpdates: Array<{
-    type: string;
-    description: string;
-    timestamp: string;
-    status: 'completed' | 'in-progress' | 'failed';
-  }>;
-}
-
 export class ApiClient {
   private config: BackendConfig;
 
@@ -99,45 +84,10 @@ export class ApiClient {
     return this.makeRequest<import('./client-storage').ProjectData>(`/api/projects/${projectId}`);
   }
 
-  async getAllProjects(): Promise<import('./client-storage').ProjectData[]> {
-    return this.makeRequest<import('./client-storage').ProjectData[]>('/api/projects');
-  }
-
-  async getActiveProjects(): Promise<import('./client-storage').ProjectData[]> {
-    return this.makeRequest<import('./client-storage').ProjectData[]>('/api/projects?status=active');
-  }
-
-  async getRecentProjects(limit: number = 10): Promise<import('./client-storage').ProjectData[]> {
-    return this.makeRequest<import('./client-storage').ProjectData[]>(`/api/projects?recent=${limit}`);
-  }
-
   async cancelProject(projectId: string): Promise<void> {
     await this.makeRequest(`/api/projects/${projectId}/cancel`, {
       method: 'POST',
     });
-  }
-
-  async deleteProject(projectId: string): Promise<void> {
-    await this.makeRequest(`/api/projects/${projectId}`, {
-      method: 'DELETE',
-    });
-  }
-
-  // Agent status endpoints
-  async getAgentStatus(): Promise<AgentStatus> {
-    return this.makeRequest<AgentStatus>('/api/agent/status');
-  }
-
-  async getKnowledgeDomains(): Promise<Array<{
-    name: string;
-    coverage: number;
-    sources: number;
-  }>> {
-    return this.makeRequest<Array<{
-      name: string;
-      coverage: number;
-      sources: number;
-    }>>('/api/agent/knowledge-domains');
   }
 
   // File download endpoints
