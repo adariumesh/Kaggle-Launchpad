@@ -2,6 +2,7 @@ import './globals.css';
 import type { Metadata } from 'next/types';
 import { Inter } from 'next/font/google';
 import { Toaster } from '@/components/ui/sonner';
+import { Footer } from '@/components/footer';
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -25,7 +26,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={inter.variable}>
       <body className={`${inter.className} antialiased`}>
-        {children}
+        <main className="min-h-screen">
+          {children}
+        </main>
+        <Footer />
         <Toaster 
           position="top-right"
           toastOptions={{
